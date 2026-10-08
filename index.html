@@ -1,0 +1,1927 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0e1113">
+<title>Gêmeo Digital Smart 4.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+*{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}
+/* Layout: full-bleed 3D stage; MES / Loja column on the left, station and IO column on the right, controls docked at the bottom */
+:root{
+  --bg:#0e1113; --panel:rgba(17,21,23,.88); --line:rgba(150,170,175,.17);
+  --fg:#e6ecee; --muted:#8d999e; --accent:#62d26f; --accent-ink:#0b2410;
+  --ok:#62d26f; --warn:#f0b43c; --crit:#e5484d; --info:#5aa9e6;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);overflow:hidden}
+#stage{position:fixed;inset:0}
+#stage canvas{display:block}
+.hud{position:fixed;z-index:5;pointer-events:none}
+.panel{pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.eyebrow{font:500 11px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{font:700 28px/1 var(--f-display);margin:6px 0 4px;text-transform:uppercase;text-wrap:balance}
+h2{font:700 21px/1 var(--f-display);text-transform:uppercase;margin:6px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h3{font:500 11px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+#left{top:calc(env(safe-area-inset-top,0px) + 16px);left:16px;width:350px;display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 110px)}
+#head{padding:14px 16px;flex:none}
+#head p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.45}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.kpi b{display:block;font:600 21px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.kpi span{display:block;font:400 10px/1.25 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
+#mes{padding:12px 16px;overflow:auto;min-height:0}
+#orders{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:6px}
+#orders li{display:grid;grid-template-columns:46px 1fr auto;align-items:center;gap:8px;font-size:12px}
+#orders .num{font-family:var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.floors{display:flex;gap:6px;flex-wrap:wrap}
+.fl{display:flex;align-items:center;gap:2px;padding:2px 3px;border-radius:4px;background:rgba(255,255,255,.04)}
+.fl b{width:11px;height:11px;border-radius:2px;display:block;border:1px solid rgba(255,255,255,.25)}
+.fl i{width:6px;height:11px;border-radius:1px;display:block;border:1px solid rgba(255,255,255,.2)}
+.pill{font:500 10px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:3px 6px;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.st-fila{color:var(--muted)}.st-ativo{color:var(--info)}.st-ok{color:var(--ok)}
+details{border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font:600 13px/1 var(--f-body);list-style:none;display:flex;justify-content:space-between;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--muted);font-family:var(--f-mono)}
+details[open] summary::after{content:"–"}
+.form{display:grid;gap:10px;margin-top:10px}
+.lab{display:block;font:400 10.5px/1 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.seg{display:flex;gap:4px}
+.seg button{min-width:38px}
+.frow{display:grid;grid-template-columns:52px repeat(4,minmax(0,1fr));gap:4px;align-items:center;font-size:11px}
+.frow span{font-family:var(--f-mono);color:var(--muted);font-size:10.5px}
+.frow select{padding:6px 4px;font-size:11px;min-width:0}
+.fhead span{font:400 10px/1 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.check{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+#side{top:calc(env(safe-area-inset-top,0px) + 16px);right:16px;width:330px;display:flex;flex-direction:column;gap:10px;max-height:calc(100% - 110px)}
+#info{padding:14px 16px;overflow:auto;min-height:0}
+#info p{margin:0 0 10px;font-size:12.5px;line-height:1.5;color:#c9d2d5}
+.chip{font:500 10px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;padding:4px 7px;border-radius:99px;border:1px solid currentColor}
+.chip.run{color:var(--ok)}.chip.idle{color:var(--muted)}.chip.wait{color:var(--warn)}.chip.stop{color:var(--crit)}
+.now{font-size:12.5px;margin:0 0 6px;line-height:1.4}
+.now b{font-weight:600}
+.bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin:6px 0 12px}
+.bar i{display:block;height:100%;width:0;background:var(--accent)}
+.io{display:grid;grid-template-columns:auto auto 1fr;gap:4px 8px;font-size:11.5px;align-items:center}
+.io .a{font-family:var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.io .v{font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--accent);text-align:right}
+.led{width:9px;height:9px;border-radius:50%;background:#2a3135;border:1px solid #3a4448;display:block}
+.led.on{background:var(--ok);border-color:var(--ok);box-shadow:0 0 6px var(--ok)}
+.led.q.on{background:var(--warn);border-color:var(--warn);box-shadow:0 0 6px var(--warn)}
+.io .sec{grid-column:1/-1;font:500 10px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.kit{font-size:12px;color:var(--muted);margin:0 0 8px;line-height:1.45}
+#log{padding:12px 16px;max-height:170px;overflow:auto;flex:none}
+#log ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;font-size:11.5px;line-height:1.35}
+#log li{display:grid;grid-template-columns:40px 1fr;gap:6px}
+#log time{font-family:var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+#controls{left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);max-width:calc(100% - 32px)}
+#controls .panel{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;padding:8px}
+.views{display:flex;gap:4px;flex-wrap:wrap}
+.sep{width:1px;height:26px;background:var(--line);margin:0 3px}
+button,select{font:500 12.5px/1 var(--f-body);color:var(--fg);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:7px;padding:8px 11px;cursor:pointer}
+select option{background:#16191b;color:var(--fg)}
+button:hover,select:hover{background:rgba(255,255,255,.1)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+#btnStop{background:var(--crit);border-color:var(--crit);color:#fff;font-weight:600}
+#btnMes{display:none}
+#banner{top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+#banner .panel{padding:18px 22px;border-color:var(--crit)}
+#banner b{display:block;font:700 26px/1 var(--f-display);text-transform:uppercase;color:var(--crit);margin-bottom:6px}
+#banner p{margin:0 0 12px;color:#c9d2d5;font-size:13px}
+#banner button{background:var(--warn);color:#241900;border-color:var(--warn);font-weight:600}
+.lbl{font:600 13px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;color:var(--fg);background:rgba(14,17,19,.8);border:1px solid var(--line);padding:5px 8px;border-radius:5px;white-space:nowrap;pointer-events:none}
+.lbl em{font-style:normal;color:var(--accent);margin-right:5px}
+.lbl.net{font:500 10.5px/1 var(--f-mono);letter-spacing:.04em;text-transform:none;color:var(--accent)}
+@media (max-width:1180px){#left{width:310px}#side{width:290px}}
+@media (max-width:820px){
+  h1{font-size:22px}
+  #head p{display:none}
+  #left{right:16px;width:auto}
+  #mes{display:none}
+  #mes.open{display:block;max-height:46vh}
+  #btnMes{display:inline-block}
+  #side{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 128px);left:16px;width:auto;max-height:34%}
+  #log{display:none}
+  #info p,.kit{display:none}
+  #controls{left:16px;right:16px;transform:none;max-width:none}
+  .views button{padding:7px 8px}
+}
+</style>
+
+</head>
+<body>
+<div id="stage"></div>
+
+<div id="left" class="hud">
+  <header id="head" class="panel">
+    <div class="eyebrow">Gêmeo digital · banco de ensaios</div>
+    <h1>Smart 4.0</h1>
+    <p>Fluxo integrado do guia do educador: a loja gera a OP, o estoque libera uma base por andar, o processo separa 3 lâminas por andar, o UR3e monta e empilha, e a expedição armazena o pedido.</p>
+    <div class="kpis">
+      <div class="kpi"><b id="kDone">0</b><span>OPs concluídas</span></div>
+      <div class="kpi"><b id="kWip">0</b><span>Em produção</span></div>
+      <div class="kpi"><b id="kLead">–</b><span>Lead time</span></div>
+      <div class="kpi"><b id="kClock">00:00</b><span>Tempo</span></div>
+    </div>
+  </header>
+  <section id="mes" class="panel" aria-label="Ordens de produção">
+    <h3>Ordens de produção · MES</h3>
+    <ol id="orders"></ol>
+    <details id="newOrder">
+      <summary>Loja · personalizar pedido</summary>
+      <div class="form">
+        <div><span class="lab">Andares</span><div class="seg" id="segFloors"><button type="button" data-n="1" aria-pressed="true">1</button><button type="button" data-n="2">2</button><button type="button" data-n="3">3</button></div></div>
+        <div id="floorRows"></div>
+        <div class="row">
+          <button type="button" id="btnRandom">Aleatório</button>
+          <button type="button" class="primary" id="btnOrder">Gerar pedido</button>
+        </div>
+        <label class="check" for="chkAuto"><input type="checkbox" id="chkAuto" checked> Pedidos automáticos da loja</label>
+        <label class="check" for="chkQC"><input type="checkbox" id="chkQC" checked> Simular lâmina trocada no magazine (controle de qualidade)</label>
+      </div>
+    </details>
+  </section>
+</div>
+
+<aside id="side" class="hud">
+  <section id="info" class="panel">
+    <div class="eyebrow" id="iEyebrow">Visão geral</div>
+    <h2><span id="iName">Linha completa</span> <span class="chip run" id="iChip">Operando</span></h2>
+    <p id="iDesc"></p>
+    <div class="kit" id="iKit"></div>
+    <div class="now" id="iNow"></div>
+    <div class="bar"><i id="iBar"></i></div>
+    <div class="io" id="iIO"></div>
+  </section>
+  <section id="log" class="panel">
+    <h3>Eventos</h3>
+    <ol id="logList"></ol>
+  </section>
+</aside>
+
+<nav id="controls" class="hud" aria-label="Controles">
+  <div class="panel">
+    <button id="btnPlay" aria-pressed="true">Pausar</button>
+    <select id="selSpeed" aria-label="Velocidade">
+      <option value="0.5">0,5×</option><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option>
+    </select>
+    <button id="btnStop">Emergência</button>
+    <span class="sep"></span>
+    <div class="views" role="group" aria-label="Câmera">
+      <button data-view="-1">Geral</button>
+      <button data-view="0">Estoque</button>
+      <button data-view="1">Processo</button>
+      <button data-view="2">Montagem</button>
+      <button data-view="3">Expedição</button>
+      <button data-view="4">Integração</button>
+    </div>
+    <span class="sep"></span>
+    <button id="btnNet" aria-pressed="false">Rede</button>
+    <button id="btnDoors" aria-pressed="false">Portas</button>
+    <button id="btnLabels" aria-pressed="true">Rótulos</button>
+    <button id="btnMes">Pedidos</button>
+  </div>
+</nav>
+
+<div id="banner" class="hud" hidden>
+  <div class="panel">
+    <b>Parada de emergência</b>
+    <p>Relés de segurança abertos: eixos, robô e esteiras bloqueados.</p>
+    <button id="btnReset">Rearmar e retomar</button>
+  </div>
+</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"./vendor/three/build/three.module.js",
+  "three/addons/":"./vendor/three/examples/jsm/"
+}}
+</script>
+<script type="module">import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
+
+/* =============== renderer / scene =============== */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+stage.appendChild(renderer.domElement);
+const labelR = new CSS2DRenderer();
+labelR.setSize(innerWidth, innerHeight);
+Object.assign(labelR.domElement.style,{position:'absolute',top:'0',left:'0',pointerEvents:'none'});
+stage.appendChild(labelR.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xdfe2e4);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+scene.environmentIntensity = 0.8;
+
+// sala: x ∈ [-ROOM.x, ROOM.x], z ∈ [-ROOM.zb, ROOM.zf], teto em ROOM.h
+const ROOM = { x:5.6, zb:3.2, zf:4.6, h:3.2 };
+const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 0.02, 40);
+const HOME = { pos:new THREE.Vector3(0.85, 1.95, 3.55), tgt:new THREE.Vector3(-0.3, 1.15, -0.3) };
+camera.position.copy(HOME.pos);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(HOME.tgt);
+controls.enableDamping = true;
+controls.minDistance = 0.25; controls.maxDistance = 6.5;
+controls.maxPolarAngle = 1.55;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x9a958f, 0.9));
+const sun = new THREE.DirectionalLight(0xffffff, 1.9);
+sun.position.set(1.6, 6, 2.6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera,{left:-3.2,right:3.2,top:2.6,bottom:-2.6,near:1,far:12});
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.01;
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0xf3f6ff, 0.55); fill.position.set(-3, 4, 4); scene.add(fill);
+/* =============== materials =============== */
+const std = (color, o={}) => new THREE.MeshStandardMaterial({ color, roughness:.5, metalness:.2, ...o });
+const M = {
+  frame: std(0x5d6268,{roughness:.45,metalness:.35}),
+  body: std(0x17191b,{roughness:.6}),
+  door: std(0x0e0f10,{roughness:.12,metalness:.3,transparent:true,opacity:.93}),
+  plinth: std(0x0b0c0d,{roughness:.8}),
+  alu: std(0xc9ced3,{roughness:.3,metalness:.85}),
+  aluDark: std(0x8b9298,{roughness:.4,metalness:.8}),
+  black: std(0x17191b,{roughness:.55}),
+  dark: std(0x2a2d31,{roughness:.5}),
+  white: std(0xe9ecee,{roughness:.45,metalness:.05}),
+  urBlue: std(0x8fc6e6,{roughness:.4}),
+  hmi: std(0xd0d4d7,{roughness:.45,metalness:.25}),
+  pendant: std(0x9cc7e4,{roughness:.4}),
+  plate: std(0x9aa3a8,{roughness:.6,metalness:.4}),
+  din: std(0x6f7a80), plc: std(0x2a9a8b), valve: std(0x3a6ea8,{roughness:.4}),
+  glass: new THREE.MeshStandardMaterial({ color:0xd5eef8, roughness:.05, metalness:0, transparent:true, opacity:.22, depthWrite:false }),
+  btnB: std(0x2f80ed,{emissive:0x0a2547}), btnG: std(0x2ecc71,{emissive:0x0b3d1f}), btnK: std(0x222222), btnW: std(0xeeeeee), btnR: std(0xe03a3a,{emissive:0x300a0a}),
+  estop: std(0xd8262c,{roughness:.35,emissive:0x2a0000}), estopBase: std(0xf0c419),
+  tampa: std(0x2b2d30,{roughness:.35}),
+  slot: std(0x0b0c0d,{roughness:.7}),
+  chain: std(0x111213,{roughness:.7}),
+  yellow: std(0xe7b416,{roughness:.45}),
+};
+const BLOCK_COL = { vermelho:0xc8372f, azul:0x2f6fc4, preto:0x1f2124 };
+const LAM_COL = { azul:0x1f5fd6, vermelho:0xd32f2f, branco:0xf2f2f2, preto:0x121314, amarelo:0xf4c20d, verde:0x3c8b3c };
+const MODELS = ['casa','barco','estrela'];
+const BLOCK_MAT = Object.fromEntries(Object.entries(BLOCK_COL).map(([k,c])=>[k,std(c,{roughness:.4,metalness:.05})]));
+const hex = c => '#'+c.toString(16).padStart(6,'0');
+const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
+
+function box(w,h,d,mat,x=0,y=0,z=0,parent=scene){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); m.castShadow=m.receiveShadow=true; if(parent) parent.add(m); return m; }
+function rbox(w,h,d,r,mat,x=0,y=0,z=0,parent=scene){ const m=new THREE.Mesh(new RoundedBoxGeometry(w,h,d,3,r),mat); m.position.set(x,y,z); m.castShadow=m.receiveShadow=true; if(parent) parent.add(m); return m; }
+function cyl(r1,r2,h,mat,x=0,y=0,z=0,parent=scene,seg=24){ const m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,seg),mat); m.position.set(x,y,z); m.castShadow=m.receiveShadow=true; if(parent) parent.add(m); return m; }
+const tex = c => { const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=4; return t; };
+function place(parent, obj, x=0, y=0, z=0, ry=0){ parent.attach(obj); obj.position.set(x,y,z); obj.rotation.set(0,ry,0); }
+const _v = new THREE.Vector3();
+function follow(obj, ref, dy, yaw){ ref.getWorldPosition(_v); obj.position.set(_v.x, _v.y-dy, _v.z); obj.rotation.set(0, yaw, 0); }
+// segmented cable chain between two points (decorative)
+function chain(parent, len, axis, x, y, z){ const n=Math.max(3,Math.round(len/0.022)); for(let i=0;i<n;i++){ const p=[x,y,z]; p[axis==='x'?0:axis==='y'?1:2]+= (i+0.5)*len/n - len/2; const s=axis==='x'?[len/n*0.85,0.02,0.03]:axis==='y'?[0.03,len/n*0.85,0.02]:[0.03,0.02,len/n*0.85]; box(...s,M.chain,...p,parent).castShadow=false; } }
+
+
+/* =============== component library (referências: lista de peças do manual XL4002) =============== */
+Object.assign(M, {
+  smcBody: std(0xc3c8cd,{roughness:.32,metalness:.85}),
+  smcCover: std(0xdadde0,{roughness:.5,metalness:.15}),
+  smcEnd: std(0xe6e8ea,{roughness:.55,metalness:.05}),
+  smcSeal: std(0x34373b,{roughness:.6}),
+  motor: std(0x1c1e20,{roughness:.55,metalness:.3}),
+  rod: std(0xe2e6ea,{roughness:.12,metalness:.95}),
+  profile: std(0xb9bfc5,{roughness:.38,metalness:.8}),
+  profileBlk: std(0x1b1d20,{roughness:.45,metalness:.4}),
+  cup: std(0x101112,{roughness:.8}),
+  urGray: std(0xe4e6e8,{roughness:.42,metalness:.08}),
+  urCap: std(0x7fb8de,{roughness:.35,metalness:.05}),
+  urRing: std(0x3c4044,{roughness:.5}),
+  egh: std(0x3a3f45,{roughness:.4,metalness:.5}),
+  eghJaw: std(0xaeb4ba,{roughness:.3,metalness:.85}),
+  brass: std(0xc8a24a,{roughness:.35,metalness:.9}),
+  led: std(0xffffff,{emissive:0xffffff,emissiveIntensity:0.6}),
+});
+// perfil de alumínio 30x30 / 30x60 com rasgos
+function profile(len, w, h, axis, x, y, z, parent, mat=M.profile){
+  const s = axis==='x'?[len,h,w]:axis==='y'?[w,len,h]:[w,h,len];
+  const m = box(...s, mat, x, y, z, parent);
+  const sl = axis==='x'?[len,0.004,0.008]:axis==='y'?[0.008,len,0.004]:[0.008,0.004,len];
+  if (axis!=='y'){ box(...sl, M.slot, x, y+h/2+0.0005, z, parent).castShadow=false; }
+  return m;
+}
+// SMC LEFS16 — atuador elétrico tipo slider (fuso/correia), corpo 40 mm, motor de passo em linha
+function lefs(stroke, motorSide=1){
+  const g = new THREE.Group(); const Lb = stroke + 0.12;
+  box(Lb, 0.034, 0.040, M.smcBody, 0, 0.017, 0, g);
+  box(Lb-0.02, 0.003, 0.028, M.smcSeal, 0, 0.0355, 0, g).castShadow=false;
+  for (const s of [-1,1]) box(0.012, 0.038, 0.042, M.smcEnd, s*(Lb/2+0.006), 0.019, 0, g);
+  const mx = motorSide*(Lb/2 + 0.012 + 0.036);
+  box(0.072, 0.040, 0.040, M.smcCover, mx, 0.02, 0, g);
+  box(0.004, 0.036, 0.036, M.motor, mx + motorSide*0.038, 0.02, 0, g);
+  box(0.016, 0.012, 0.014, M.motor, mx, 0.046, 0, g);           // conector do encoder
+  const car = new THREE.Group(); car.position.y = 0.037; g.add(car);
+  box(0.064, 0.011, 0.048, M.smcBody, 0, 0.0055, 0, car);
+  box(0.064, 0.002, 0.044, M.smcEnd, 0, 0.012, 0, car).castShadow=false;
+  return { g, car, Lb, set(t){ car.position.x = -stroke/2 + Math.max(0, Math.min(stroke, t)); } };
+}
+// SMC LEYG16 — atuador elétrico tipo haste com guia (2 hastes-guia + placa)
+function leyg(stroke){
+  const g = new THREE.Group();
+  box(0.046, 0.044, 0.20, M.smcBody, 0, 0, 0, g);                     // corpo + guia, eixo +z
+  box(0.044, 0.042, 0.075, M.smcCover, 0, 0.0, -0.137, g);             // motor
+  box(0.04, 0.04, 0.004, M.motor, 0, 0, -0.177, g);
+  const plate = new THREE.Group(); g.add(plate);
+  box(0.062, 0.052, 0.012, M.smcBody, 0, 0, 0.006, plate);
+  const rods = [];
+  for (const [rx,ry,r] of [[-0.018,0.012,0.004],[0.018,0.012,0.004],[0,-0.008,0.005]]){ const c=cyl(r,r,1,M.rod,rx,ry,0,g,12); c.rotation.x=Math.PI/2; rods.push(c); }
+  const o = { g, plate, set(t){ t=Math.max(0,Math.min(stroke,t)); plate.position.z = 0.1 + t; rods.forEach(c=>{ c.scale.y = 0.1+t; c.position.z = (0.1+t)/2; }); } };
+  o.set(0); return o;
+}
+// SMC LERH50K — mesa giratória elétrica
+function lerh(){
+  const g = new THREE.Group();
+  box(0.078, 0.042, 0.078, M.smcBody, 0, 0.021, 0, g);
+  box(0.07, 0.036, 0.036, M.smcCover, 0.074, 0.018, 0, g);              // motor lateral
+  box(0.004, 0.032, 0.032, M.motor, 0.111, 0.018, 0, g);
+  const table = new THREE.Group(); table.position.y = 0.042; g.add(table);
+  cyl(0.031, 0.031, 0.01, M.smcEnd, 0, 0.005, 0, table, 32);
+  for (let i=0;i<4;i++){ const a=i*Math.PI/2; cyl(0.003,0.003,0.002,M.motor,Math.cos(a)*0.02,0.011,Math.sin(a)*0.02,table,8); }
+  return { g, table };
+}
+// cilindro sem haste SMC MY1B (alimentador / translado) com ventosa ZPT25
+function my1b(len){
+  const g = new THREE.Group();
+  box(0.034, 0.03, len, M.smcBody, 0, 0.015, 0, g);
+  box(0.022, 0.003, len-0.03, M.smcSeal, 0, 0.0305, 0, g).castShadow=false;
+  for (const s of [-1,1]) { box(0.038, 0.034, 0.016, M.smcEnd, 0, 0.017, s*(len/2+0.008), g); cyl(0.004,0.004,0.01,M.brass,0.012,0.024,s*(len/2+0.016),g,8).rotation.x=Math.PI/2; }
+  const car = new THREE.Group(); g.add(car);
+  box(0.044, 0.02, 0.07, M.smcBody, 0, 0.04, 0, car);
+  return { g, car, set(z){ car.position.z = z; } };
+}
+function vacuumCup(parent, x, y, z, dir='y', r=0.0125){
+  const g = new THREE.Group(); g.position.set(x,y,z); parent.add(g);
+  cyl(0.005,0.005,0.02,M.brass,0,0.012,0,g,10);
+  cyl(0.008,0.008,0.006,M.cup,0,0.002,0,g,14);
+  cyl(r*0.6,r,0.01,M.cup,0,-0.006,0,g,18);
+  if (dir==='z') g.rotation.x = -Math.PI/2; if (dir==='-z') g.rotation.x = Math.PI/2;
+  return g;
+}
+// garra pneumática SMC MHZL2-16D com dedos extensores usinados
+function mhzl2(){
+  const g = new THREE.Group();
+  box(0.054, 0.026, 0.03, M.smcBody, 0, 0, 0, g);
+  box(0.056, 0.004, 0.026, M.smcSeal, 0, -0.015, 0, g);
+  const jaws = [];
+  for (const s of [-1,1]){ const j = new THREE.Group(); g.add(j); box(0.01,0.008,0.024,M.smcEnd,0,-0.019,0,j); box(0.006,0.02,0.07,M.alu,0,-0.022,0.04,j); jaws.push({ j, s }); }
+  return { g, set(half){ jaws.forEach(({j,s})=>{ j.position.x = s*half; }); } };
+}
+// cilindro mini ISO Ø12 com guia linear de buchas (eixo Z do processo)
+function isoGuided(stroke){
+  const g = new THREE.Group();
+  box(0.05, 0.024, 0.03, M.smcBody, 0, 0, 0, g);                       // bloco das buchas
+  cyl(0.008,0.008,0.11,M.rod,0,0.065,0,g,16);                           // corpo do cilindro
+  cyl(0.009,0.009,0.01,M.smcEnd,0,0.12,0,g,16); cyl(0.009,0.009,0.008,M.smcEnd,0,0.014,0,g,16);
+  const mov = new THREE.Group(); g.add(mov);
+  const guides = [];
+  for (const sx of [-0.018,0.018]){ const c=cyl(0.004,0.004,1,M.rod,sx,0,0,g,10); guides.push(c); }
+  const rod = cyl(0.003,0.003,1,M.rod,0,0,0,g,10);
+  box(0.05,0.008,0.024,M.smcBody,0,0,0,mov);
+  const o = { g, mov, set(e){ e=Math.max(0,Math.min(stroke,e)); const yb=-0.03-e; mov.position.y=yb; for (const c of guides){ c.scale.y=0.16+e; c.position.y=0.05-(0.16+e)/2; } rod.scale.y=e+0.03; rod.position.y=-0.012-(e+0.018)/2; } };
+  o.set(0); return o;
+}
+// câmera MVISIA com iluminação em anel
+function camera3d(parent, x, y, z, ry){
+  const g = new THREE.Group(); g.position.set(x,y,z); g.rotation.y = ry; parent.add(g);
+  rbox(0.05,0.05,0.07,0.004,M.black,0,0,0,g);
+  box(0.03,0.012,0.02,M.dark,0,0.03,-0.02,g);
+  const lens = cyl(0.014,0.016,0.03,M.slot,0,0,0.05,g,24); lens.rotation.x=Math.PI/2;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.022,0.004,10,32), M.led); ring.position.z=0.066; g.add(ring);
+  return { g, ring };
+}
+// SCHUNK EGH 80-IOL-N com kit de adaptação UR (corpo 114 × 86,5 mm, curso 40 mm por mordente)
+function egh80(){
+  const g = new THREE.Group();
+  cyl(0.0315,0.0315,0.012,M.urRing,0,-0.006,0,g,32);                   // flange de adaptação ISO 9409
+  rbox(0.114,0.066,0.0865,0.006,M.egh,0,-0.045,0,g);
+  box(0.116,0.008,0.07,M.eghJaw,0,-0.082,0,g);                          // guia dos mordentes
+  box(0.03,0.016,0.004,std(0x1b5fae),0,-0.04,0.0435,g);                 // etiqueta
+  cyl(0.004,0.004,0.02,M.motor,0.05,-0.03,0.045,g,8).rotation.x=Math.PI/2; // conector M8
+  const jaws = [];
+  for (const s of [-1,1]){
+    const j = new THREE.Group(); g.add(j);
+    box(0.024,0.014,0.05,M.eghJaw,0,-0.093,0,j);
+    box(0.008,0.062,0.03,M.alu,s*-0.004,-0.13,0,j);                    // dedo
+    box(0.004,0.02,0.026,M.cup,s*-0.009,-0.15,0,j);                    // pastilha de borracha
+    jaws.push({ j, s });
+  }
+  return { g, TCP:0.155, set(half){ jaws.forEach(({j,s})=>{ j.position.x = s*(half+0.011); }); } };
+}
+// Universal Robots UR3e — parâmetros DH oficiais (d1 151,85 · a2 243,55 · a3 213,2 · d4 131,05 · d5 85,35 · d6 92,1 mm)
+const UR = { d1:0.15185, a2:0.24355, a3:0.2132, d4:0.13105, d5:0.08535, d6:0.0921 };
+function ur3e(){
+  const base = new THREE.Group();
+  cyl(0.064,0.064,0.012,M.urRing,0,0.006,0,base,40);
+  cyl(0.047,0.05,0.07,M.urGray,0,0.047,0,base,40);
+  cyl(0.0475,0.0475,0.012,M.urCap,0,0.088,0,base,40);
+  const yaw = new THREE.Group(); yaw.position.y = 0.094; base.add(yaw);
+  cyl(0.046,0.046,0.03,M.urGray,0,0.015,0,yaw,40);
+  const housing = (parent, r, len, z0, z1, capEnd=true) => { const m=cyl(r,r,z1-z0,M.urGray,0,0,(z0+z1)/2,parent,40); m.rotation.x=Math.PI/2; if (capEnd){ const c=cyl(r*0.96,r*0.96,0.008,M.urCap,0,0,z1+0.002,parent,40); c.rotation.x=Math.PI/2; const rr=cyl(r*0.55,r*0.55,0.003,M.urRing,0,0,z1+0.006,parent,24); rr.rotation.x=Math.PI/2; } return m; };
+  const tube = (parent, r, x0, x1, z) => { const geo=new THREE.CylinderGeometry(r,r,x1-x0,32); geo.rotateZ(-Math.PI/2); geo.translate((x0+x1)/2,0,z); const m=new THREE.Mesh(geo,M.urGray); m.castShadow=true; parent.add(m); return m; };
+  const sh = new THREE.Group(); sh.position.y = UR.d1 - 0.094; yaw.add(sh);
+  cyl(0.046,0.046,0.06,M.urGray,0,-0.03,0,sh,40);                       // pescoço J1→J2
+  housing(sh, 0.046, 0.12, -0.046, 0.075);
+  const p2 = new THREE.Group(); sh.add(p2);
+  housing(p2, 0.044, 0.1, 0.06, 0.14, false);
+  tube(p2, 0.029, 0.03, UR.a2-0.03, 0.12);
+  const el = new THREE.Group(); el.position.x = UR.a2; p2.add(el);
+  housing(el, 0.038, 0.1, 0.03, 0.15);
+  tube(el, 0.024, 0.03, UR.a3-0.03, 0.035);
+  const w1 = new THREE.Group(); w1.position.x = UR.a3; el.add(w1);
+  housing(w1, 0.032, 0.1, 0.0, UR.d4+0.032);
+  const w2 = new THREE.Group(); w2.position.set(0, 0, UR.d4); w1.add(w2);
+  { const m=cyl(0.032,0.032,UR.d5+0.03,M.urGray,(UR.d5+0.03)/2-0.0,0,0,w2,40); m.rotation.z=Math.PI/2; const c=cyl(0.031,0.031,0.008,M.urCap,UR.d5+0.034,0,0,w2,40); c.rotation.z=Math.PI/2; }
+  const w3 = new THREE.Group(); w3.position.set(UR.d5, 0, 0); w2.add(w3);
+  cyl(0.032,0.032,UR.d6-0.012,M.urGray,0,-(UR.d6-0.012)/2,0,w3,40);
+  cyl(0.031,0.031,0.008,M.urCap,0,-UR.d6+0.008,0,w3,40);
+  const tool = new THREE.Group(); tool.position.y = -UR.d6; w3.add(tool);
+  cyl(0.0315,0.0315,0.004,M.urRing,0,-0.002,0,tool,32);
+  const q = [0,0,0,0,0,0];
+  function setQ(q1,q2,q3,q4,q6){ yaw.rotation.y=q1; p2.rotation.z=q2; el.rotation.z=q3; w1.rotation.z=q4; tool.rotation.y=q6; q[0]=q1; q[1]=q2; q[2]=q3; q[3]=q4; q[4]=-Math.PI/2; q[5]=q6; }
+  // IK (ferramenta para baixo): alvo do flange no referencial da base; retorna false se fora do alcance
+  function ik(fx, fy, fz, wYaw){
+    const rho = Math.hypot(fx, fz); const R = Math.sqrt(Math.max(1e-6, rho*rho - UR.d4*UR.d4));
+    const q1 = Math.atan2(UR.d4, R) - Math.atan2(fz, fx);
+    const r = R - UR.d5, h = fy + UR.d6 - UR.d1;
+    let c3 = (r*r + h*h - UR.a2*UR.a2 - UR.a3*UR.a3)/(2*UR.a2*UR.a3); c3 = Math.max(-1, Math.min(1, c3));
+    const q3 = -Math.acos(c3);
+    const q2 = Math.atan2(h, r) - Math.atan2(UR.a3*Math.sin(q3), UR.a2 + UR.a3*Math.cos(q3));
+    setQ(q1, q2, q3, -(q2+q3), wYaw - q1);
+  }
+  return { base, tool, ik, q };
+}
+
+/* =============== laboratório (piso vinílico, divisórias de vidro, identidade UniSENAI) =============== */
+const room = new THREE.Group(); scene.add(room);
+{
+  const W = ROOM.x*2, D = ROOM.zb + ROOM.zf, H = ROOM.h, cz = (ROOM.zf - ROOM.zb)/2;
+  // piso vinílico amadeirado
+  const ft = new THREE.TextureLoader().load('floor_vinil.jpg', t=>{ t.needsUpdate=true; }); ft.colorSpace = THREE.SRGBColorSpace; ft.anisotropy = 8;
+  ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set(W/1.25, D/1.25);
+  const floorM = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map:ft, color:0xffffff, roughness:.55, metalness:0 }));
+  floorM.rotation.x = -Math.PI/2; floorM.position.z = cz; floorM.receiveShadow = true; room.add(floorM);
+  // faixa de demarcação verde/amarela em torno da célula
+  const tape = std(0x7cc243,{roughness:.6}), tapeY = std(0xe8c21a,{roughness:.6});
+  const TX = 2.25, TZ0 = -0.95, TZ1 = 1.15;
+  for (const [w,d,x,z] of [[TX*2,0.05,0,TZ0],[TX*2,0.05,0,TZ1],[0.05,TZ1-TZ0,-TX,(TZ0+TZ1)/2],[0.05,TZ1-TZ0,TX,(TZ0+TZ1)/2]]) box(w,0.002,d,tape,x,0.001,z,room).castShadow=false;
+  for (let i=0;i<16;i++) box(0.12,0.0025,0.05,tapeY,-TX+0.15+i*0.29,0.0012,TZ1,room).castShadow=false;
+  // paredes
+  const wallM = std(0xeceeef,{roughness:.9,metalness:0});
+  const wall = (w,h,x,y,z,ry) => { const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),wallM); m.position.set(x,y,z); m.rotation.y=ry; m.receiveShadow=true; room.add(m); return m; };
+  // divisória de vidro no fundo (com corredor atrás)
+  const glassB = new THREE.MeshStandardMaterial({ color:0xe8f4f8, roughness:.03, metalness:0, transparent:true, opacity:.16, depthWrite:false, side:THREE.DoubleSide });
+  { const gb = new THREE.Mesh(new THREE.PlaneGeometry(W, H-0.1), glassB); gb.position.set(0, H/2, -ROOM.zb); room.add(gb);
+    for (const x of [-ROOM.x, -4.0, -1.6, 1.2, 3.4, ROOM.x]) box(0.05,H,0.05,M.alu,x,H/2,-ROOM.zb,room);
+    box(W,0.05,0.05,M.alu,0,0.02,-ROOM.zb,room); box(W,0.06,0.05,M.alu,0,H-0.03,-ROOM.zb,room);
+    for (const y of [1.05,1.15]) box(W,0.03,0.006,std(0x8fd0a0,{transparent:true,opacity:.6}),0,y,-ROOM.zb+0.01,room).castShadow=false;
+    const cf = new THREE.Mesh(new THREE.PlaneGeometry(W+2.4, 2.4), std(0xc9cbcc,{roughness:.6})); cf.rotation.x=-Math.PI/2; cf.position.set(1.2, 0.001, -ROOM.zb-1.2); room.add(cf);
+    const fw = new THREE.Mesh(new THREE.PlaneGeometry(W+2.4, H), std(0xe3e5e6,{roughness:.9})); fw.position.set(1.2, H/2, -ROOM.zb-2.4); room.add(fw);
+    const cc = new THREE.Mesh(new THREE.PlaneGeometry(W+2.4, 2.4), std(0xf2f3f4,{roughness:.95})); cc.rotation.x=Math.PI/2; cc.position.set(1.2, H, -ROOM.zb-1.2); room.add(cc);
+    for (const x of [-3.6, 2.4, 4.5]) box(1.0,2.1,0.04,std(0x8b6a4a,{roughness:.6}),x,1.05,-ROOM.zb-2.38,room);
+    const rw = new THREE.Mesh(new THREE.PlaneGeometry(2.4, H), std(0xe3e5e6,{roughness:.9})); rw.rotation.y=-Math.PI/2; rw.position.set(ROOM.x+2.4, H/2, -ROOM.zb-1.2); room.add(rw);
+    const rc = new THREE.Mesh(new THREE.PlaneGeometry(2.4, D), std(0xf2f3f4,{roughness:.95})); rc.rotation.x=Math.PI/2; rc.position.set(ROOM.x+1.2, H, cz); room.add(rc);
+    const lw = new THREE.Mesh(new THREE.PlaneGeometry(2.4, H), wallM); lw.rotation.y=Math.PI/2; lw.position.set(-ROOM.x, H/2, -ROOM.zb-1.2); room.add(lw); }
+  wall(W, H, 0, H/2, ROOM.zf, Math.PI);                     // frente
+  wall(D, H, -ROOM.x, H/2, cz, Math.PI/2);                  // esquerda (janelas)
+  // rodapé
+  { const m=box(D,0.08,0.012,M.dark,-ROOM.x+0.006,0.04,cz,room); m.rotation.y=Math.PI/2; }
+  // teto com luminárias LED 625 × 625
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W, D), std(0xf4f5f6,{roughness:.95})); ceil.rotation.x = Math.PI/2; ceil.position.set(0,H,cz); room.add(ceil);
+  const ledM = new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xffffff, emissiveIntensity:1.0 });
+  for (let ix=-3; ix<=3; ix++) for (let iz=-1; iz<=2; iz++){ const p=new THREE.Mesh(new THREE.PlaneGeometry(0.6,0.6), ledM); p.rotation.x=Math.PI/2; p.position.set(ix*1.6, H-0.005, iz*1.9-0.3); room.add(p); box(0.63,0.012,0.63,M.alu,ix*1.6,H-0.004,iz*1.9-0.3,room).castShadow=false; }
+  // eletrocalha e eletrodutos no teto (como na foto do laboratório)
+  box(W-0.4, 0.05, 0.3, std(0xb7bcc1,{metalness:.7,roughness:.4}), 0, H-0.35, -ROOM.zb+0.6, room).castShadow=false;
+  for (const z of [-ROOM.zb+0.25, -ROOM.zb+0.32]) { const c=cyl(0.016,0.016,W-0.4,std(0xa9aeb3,{metalness:.7,roughness:.35}),0,H-0.12,z,room,10); c.rotation.z=Math.PI/2; c.castShadow=false; }
+  // janelas na parede esquerda
+  const sky = document.createElement('canvas'); sky.width=8; sky.height=128; const sg=sky.getContext('2d'); const gr=sg.createLinearGradient(0,0,0,128); gr.addColorStop(0,'#cfe3f3'); gr.addColorStop(.7,'#eef4f6'); gr.addColorStop(.72,'#9db08f'); gr.addColorStop(1,'#7f9473'); sg.fillStyle=gr; sg.fillRect(0,0,8,128);
+  const skyM = new THREE.MeshBasicMaterial({ map:tex(sky) });
+  for (const z of [-1.6, 0.4, 2.4]){
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.25), skyM); win.rotation.y=Math.PI/2; win.position.set(-ROOM.x+0.01, 1.75, z); room.add(win);
+    for (const dz of [-0.85,0,0.85]) box(0.05,1.3,0.04,M.dark,-ROOM.x+0.03,1.75,z+dz,room);
+    for (const y of [1.12,1.75,2.38]) box(0.05,0.04,1.74,M.dark,-ROOM.x+0.03,y,z,room);
+    box(0.14,0.03,1.8,std(0xd9dcdf),-ROOM.x+0.07,1.1,z,room);
+  }
+  // divisória de vidro (lado direito) com montantes de alumínio e corredor ao fundo
+  const glassM = new THREE.MeshStandardMaterial({ color:0xe8f4f8, roughness:.03, metalness:0, transparent:true, opacity:.16, depthWrite:false, side:THREE.DoubleSide });
+  const gp = new THREE.Mesh(new THREE.PlaneGeometry(D, H-0.1), glassM); gp.rotation.y = -Math.PI/2; gp.position.set(ROOM.x, H/2, cz); room.add(gp);
+  for (let i=0;i<=6;i++){ const z = -ROOM.zb + i*D/6; box(0.05,H,0.05,M.alu,ROOM.x,H/2,z,room); }
+  box(0.05,0.05,D,M.alu,ROOM.x,0.02,cz,room); box(0.05,0.06,D,M.alu,ROOM.x,H-0.03,cz,room);
+  for (const y of [1.05,1.15]) box(0.006,0.03,D,std(0x8fd0a0,{transparent:true,opacity:.6}),ROOM.x-0.01,y,cz,room).castShadow=false;
+  // corredor
+  const corr = new THREE.Mesh(new THREE.PlaneGeometry(2.4, D), std(0xc9cbcc,{roughness:.6})); corr.rotation.x=-Math.PI/2; corr.position.set(ROOM.x+1.2, 0.001, cz); room.add(corr);
+  const cw = new THREE.Mesh(new THREE.PlaneGeometry(D, H), std(0xe3e5e6,{roughness:.9})); cw.rotation.y=-Math.PI/2; cw.position.set(ROOM.x+2.4, H/2, cz); room.add(cw);
+  for (const z of [-1.8, 1.2]){ box(0.04,2.1,1.0,std(0x8b6a4a,{roughness:.6}),ROOM.x+2.38,1.05,z,room); }
+  // placa de rota de fuga
+  { const c=document.createElement('canvas'); c.width=256; c.height=96; const g=c.getContext('2d'); g.fillStyle='#14843a'; g.fillRect(0,0,256,96); g.fillStyle='#fff'; g.font='bold 40px Arial'; g.fillText('SAÍDA ➜',40,62); const m=new THREE.Mesh(new THREE.PlaneGeometry(0.42,0.16), new THREE.MeshBasicMaterial({ map:tex(c) })); m.rotation.y=-Math.PI/2; m.position.set(ROOM.x-0.03, 2.55, 2.6); room.add(m); }
+  // extintor
+  { const g=new THREE.Group(); g.position.set(-ROOM.x+0.12, 0, 3.6); room.add(g); cyl(0.07,0.07,0.5,std(0xc4161c,{roughness:.35}),0,0.65,0,g,24); cyl(0.025,0.03,0.08,M.black,0,0.94,0,g,12); box(0.3,0.3,0.004,std(0xc4161c),0.1,1.25,0.0,g).rotation.y=Math.PI/2; }
+  // bancadas de apoio com computadores (integração / MES)
+  const desk = (x,z,ry) => { const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=ry; room.add(g);
+    box(1.6,0.03,0.7,std(0xd8d0c2,{roughness:.6}),0,0.74,0,g);
+    for (const sx of [-0.76,0.76]) for (const sz of [-0.3,0.3]) box(0.04,0.73,0.04,M.dark,sx,0.365,sz,g);
+    for (const sx of [-0.4,0.4]){ box(0.54,0.33,0.025,M.black,sx,1.06,-0.2,g); const s=box(0.5,0.29,0.004,std(0x15302a,{emissive:0x0d2b22}),sx,1.06,-0.186,g); s.castShadow=false; box(0.05,0.14,0.04,M.dark,sx,0.83,-0.22,g); box(0.42,0.015,0.14,M.dark,sx,0.76,0.05,g); }
+    for (const sx of [-0.4,0.4]){ const ch=new THREE.Group(); ch.position.set(sx,0,0.55); g.add(ch); cyl(0.24,0.24,0.06,M.black,0,0.47,0,ch,18); box(0.42,0.45,0.05,M.black,0,0.78,0.2,ch); cyl(0.025,0.025,0.4,M.aluDark,0,0.25,0,ch,10); }
+  };
+  desk(3.8, 3.0, Math.PI); desk(-3.6, 3.0, Math.PI);
+  // planta
+  { const g=new THREE.Group(); g.position.set(4.9,0,-2.6); room.add(g); cyl(0.22,0.17,0.45,std(0xd7d2c8),0,0.225,0,g,24); const lm=std(0x3f7a3a,{roughness:.8}); for (let i=0;i<18;i++){ const l=new THREE.Mesh(new THREE.ConeGeometry(0.05,0.7,6),lm); l.position.set((Math.random()-.5)*0.2,0.75,(Math.random()-.5)*0.2); l.rotation.set((Math.random()-.5)*1.2,Math.random()*3,(Math.random()-.5)*1.2); g.add(l); } }
+}
+// identidade visual: adesivo UniSENAI aplicado no vidro do fundo (arquivo de marca fornecido pelo usuário)
+const brandLoader = new THREE.TextureLoader();
+{
+  const decal = new THREE.Group(); decal.position.set(-0.2, 2.05, -ROOM.zb+0.004); room.add(decal);
+  const vinyl = (map, w, h, y) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map, transparent:true, depthWrite:false, side:THREE.DoubleSide, toneMapped:false })); m.position.y = y; m.renderOrder = 2; decal.add(m); return m; };
+  brandLoader.load('logo_unisenai.png', t => { t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; vinyl(t, 2.4, 2.4*320/1400, 0.2); });
+  const c=document.createElement('canvas'); c.width=1400; c.height=180; const g=c.getContext('2d');
+  const drawSub = () => { g.clearRect(0,0,1400,180); g.fillStyle='#1e1e1e'; g.textAlign='center';
+    g.font='600 54px "IBM Plex Sans", Arial, sans-serif'; g.fillText('Laboratório de Virtualização de Processos Industriais', 700, 70);
+    g.fillStyle='#e30613'; g.font='500 44px "IBM Plex Sans", Arial, sans-serif'; g.fillText('Campus Santo Amaro', 700, 140); sub.needsUpdate=true; };
+  const sub = tex(c); drawSub(); document.fonts?.ready.then(drawSub);
+  vinyl(sub, 2.5, 2.5*180/1400, -0.26);
+  // faixa jateada (película fosca) na altura dos olhos, comum em divisórias de vidro
+  const frost = new THREE.Mesh(new THREE.PlaneGeometry(2.74, 0.12), new THREE.MeshStandardMaterial({ color:0xffffff, transparent:true, opacity:.45, roughness:1, depthWrite:false })); frost.position.set(-0.2, 1.1, -ROOM.zb+0.003); room.add(frost);
+}
+/* =============== layout (manual: benches 600/600/900/600 mm, 980 mm deep, 3050 mm overall) =============== */
+const TABLE_Y = 0.92, BELT_Y = 1.0, L = 1.35, R = 0.065, ZC = 0.27, W = 0.05;
+const ZB = ZC - R, ZFR = ZC + R;          // inner lane (station side) / outer lane
+const P = 4*L + 2*Math.PI*R;
+const BENCH = [ {name:'Estoque',cx:-1.05,w:0.6}, {name:'Processo',cx:-0.45,w:0.6}, {name:'Montagem',cx:0.30,w:0.9}, {name:'Expedição',cx:1.05,w:0.6} ];
+const INTEG_X = 2.3;
+const clickables = [];
+
+function loopPos(s){
+  s = ((s%P)+P)%P;
+  if (s < 2*L) return [-L+s, ZB];
+  s -= 2*L;
+  if (s < Math.PI*R){ const th=-Math.PI/2 + s/R; return [L+R*Math.cos(th), ZC+R*Math.sin(th)]; }
+  s -= Math.PI*R;
+  if (s < 2*L) return [L-s, ZFR];
+  s -= 2*L;
+  const th = Math.PI/2 + s/R; return [-L+R*Math.cos(th), ZC+R*Math.sin(th)];
+}
+function loopFrame(s){ const a=loopPos(s), b=loopPos(s+0.002); const tx=b[0]-a[0], tz=b[1]-a[1], n=Math.hypot(tx,tz); return { x:a[0], z:a[1], tx:tx/n, tz:tz/n }; }
+const sAt = x => x + L;
+
+/* =============== cabinets =============== */
+const doors = [], doorTex = [];
+function doorTexture(name, w=256){
+  const c=document.createElement('canvas'); c.width=w; c.height=512; const t=tex(c);
+  const draw=()=>{ const g=c.getContext('2d');
+    g.clearRect(0,0,w,512);
+    g.strokeStyle='#62d26f'; g.lineWidth=5; g.beginPath(); g.moveTo(24,470); g.lineTo(w-24,470); g.stroke();
+    if (name){ g.save(); g.translate(78,450); g.rotate(-Math.PI/2);
+      g.fillStyle='#62d26f'; g.font='600 50px "Barlow Condensed", Arial Narrow, sans-serif';
+      if (g.letterSpacing!==undefined) g.letterSpacing='4px';
+      g.fillText(name.toUpperCase(),0,0); g.restore(); }
+    t.needsUpdate=true; };
+  draw(); doorTex.push(draw); return t;
+}
+function cabinet(cx, w, d, h, z, name, idx, nDoors=1){
+  const g = new THREE.Group(); g.position.set(cx,0,z); scene.add(g);
+  const ft = 0.05;
+  for (const sx of [-1,1]) rbox(ft, h-0.02, d, 0.018, M.frame, sx*(w/2-ft/2), 0.05+(h-0.02)/2, 0, g);
+  box(w-0.02, 0.05, d-0.04, M.plinth, 0, 0.025, 0, g);
+  for (const sx of [-1,1]) for (const sz of [-1,1]) cyl(0.018,0.022,0.03,M.black,sx*(w/2-0.06),0.015,sz*(d/2-0.06),g,12);
+  const t=0.02, iw = w-2*ft;
+  box(iw, t, d, M.body, 0, 0.06+t/2, 0, g);                                   // fundo
+  box(iw, h-0.12, t, M.body, 0, 0.06+(h-0.12)/2, -d/2+t/2, g);                // traseira
+  box(iw, h-0.07, 0.006, M.body, 0, 0.06+(h-0.07)/2, 0, g).visible=false;
+  // moldura frontal fechada: travessa superior (painel de operação), travessa inferior e batentes laterais
+  const TOP0 = h-0.2, BOT1 = 0.1;
+  box(iw, h-TOP0, t, M.body, 0, (TOP0+h)/2, d/2-t/2, g);
+  box(iw, BOT1-0.05, t, M.body, 0, (BOT1+0.05)/2, d/2-t/2, g);
+  for (const sx of [-1,1]) box(0.018, TOP0-BOT1, t, M.body, sx*(iw/2-0.009), (TOP0+BOT1)/2, d/2-t/2, g);
+  if (nDoors>1) box(0.014, TOP0-BOT1, t, M.body, 0, (TOP0+BOT1)/2, d/2-t/2, g);
+  // vedação de borracha em volta do vão
+  box(iw-0.03, 0.004, 0.004, M.slot, 0, TOP0-0.002, d/2+0.001, g); box(iw-0.03, 0.004, 0.004, M.slot, 0, BOT1+0.002, d/2+0.001, g);
+  box(w-2*ft-0.08, h-0.3, 0.01, M.plate, 0, 0.06+(h-0.24)/2, -d/2+0.04, g);
+  box(w-2*ft-0.12, 0.022, 0.03, M.din, 0, 0.62, -d/2+0.06, g);
+  box(w-2*ft-0.12, 0.022, 0.03, M.din, 0, 0.38, -d/2+0.06, g);
+  const n = Math.floor((w-0.2)/0.06);
+  for(let i=0;i<n;i++) box(0.045,0.1,0.07, i===0?M.plc:(i<3?M.white:M.black), -w/2+0.13+i*0.06, 0.62, -d/2+0.09, g);
+  for(let i=0;i<n;i++) box(0.035,0.08,0.06, i%3===0?M.din:M.black, -w/2+0.13+i*0.06, 0.38, -d/2+0.09, g);
+  // portas de acrílico fumê sobrepostas ao vão (10 mm de sobreposição em cada lado)
+  const dh = TOP0-BOT1+0.02, dw = (iw-0.006)/nDoors;
+  for (let k=0;k<nDoors;k++){
+    const left = -iw/2+0.003+k*dw;
+    const pivot = new THREE.Group(); pivot.position.set(left, BOT1-0.01+dh/2, d/2+0.004); g.add(pivot);
+    const door = box(dw-0.004, dh, 0.006, M.door, dw/2, 0, 0, pivot);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(dw-0.03, dh-0.03), new THREE.MeshBasicMaterial({ map:doorTexture(k===0?name:''), transparent:true }));
+    face.position.set(dw/2, 0, 0.0035); pivot.add(face);
+    // fechadura e dobradiças
+    cyl(0.009,0.009,0.01,M.aluDark,k===nDoors-1&&nDoors>1?0.03:dw-0.03,dh/2-0.05,0.007,pivot,16).rotation.x=Math.PI/2;
+    for (const yy of [dh/2-0.06, -dh/2+0.06]) box(0.012,0.04,0.012,M.aluDark,0.004,yy,-0.002,pivot);
+    doors.push({ pivot, a:0, target:0 });
+    door.userData.door = face.userData.door = pivot;
+  }
+  g.traverse(o=>{ if(o.isMesh) o.userData.station = idx; });
+  clickables.push(g);
+  return g;
+}
+const benches = BENCH.map((b,i)=>cabinet(b.cx, b.w, 0.98, TABLE_Y, 0, b.name, i, i===2?2:1));
+BENCH.forEach(b=>{
+  box(b.w-0.004, 0.02, 0.98, M.alu, b.cx, TABLE_Y-0.01, 0);
+  for(let i=0;i<9;i++) box(b.w-0.02, 0.002, 0.004, M.slot, b.cx, TABLE_Y+0.001, -0.44+i*0.1);
+  // valve terminal + filter regulator on the back edge
+  const vg=new THREE.Group(); vg.position.set(b.cx + b.w/2 - 0.12, TABLE_Y, -0.44); scene.add(vg);
+  box(0.12,0.03,0.04,M.aluDark,0,0.015,0,vg); for(let i=0;i<5;i++) box(0.018,0.035,0.035,M.valve,-0.045+i*0.022,0.045,0,vg);
+});
+const integ = cabinet(INTEG_X, 0.62, 0.62, 1.1, -0.1, 'Integração', 4);
+
+/* =============== HMI consoles (KTP700 + chave setup, start, stop, reset, emergência) =============== */
+const screens = [];
+function hmi(b, idx){
+  const g = new THREE.Group(); g.position.set(b.cx - b.w/2 + 0.2, TABLE_Y-0.055, 0.545); g.rotation.x = -0.6; scene.add(g);
+  rbox(0.34, 0.16, 0.06, 0.01, M.hmi, 0, 0, 0, g);
+  const c=document.createElement('canvas'); c.width=320; c.height=200;
+  const t = tex(c);
+  rbox(0.165,0.115,0.01,0.004,M.black,-0.07,0,0.031,g);
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.094), new THREE.MeshBasicMaterial({ map:t, toneMapped:false }));
+  scr.position.set(-0.07, 0, 0.037); g.add(scr);
+  const bm=[M.btnK,M.btnG,M.btnR,M.btnB,M.btnG,M.btnR];
+  for(let i=0;i<6;i++){ const bt=cyl(0.01,0.01,0.012,bm[i],0.035+(i%3)*0.03,0.028-Math.floor(i/3)*0.045,0.035,g,16); bt.rotation.x=Math.PI/2; }
+  const eb = cyl(0.022,0.022,0.01,M.estopBase,0.14,0,0.034,g); eb.rotation.x=Math.PI/2;
+  const e = cyl(0.016,0.018,0.02,M.estop,0.14,0,0.048,g); e.rotation.x=Math.PI/2;
+  g.traverse(o=>{ if(o.isMesh) o.userData.station = idx; });
+  e.userData.estop = eb.userData.estop = true;
+  clickables.push(g);
+  screens.push({ c, g2:c.getContext('2d'), t, idx });
+}
+BENCH.forEach((b,i)=>hmi(b,i));
+{ // UR teach pendant
+  const g = new THREE.Group(); g.position.set(BENCH[2].cx + 0.17, TABLE_Y-0.035, 0.56); g.rotation.x=-0.6; scene.add(g);
+  rbox(0.2,0.14,0.03,0.015,M.pendant,0,0,0,g);
+  box(0.16,0.1,0.004,std(0x223038,{emissive:0x0d1a20}),0,0,0.016,g);
+  const e=cyl(0.012,0.012,0.012,M.estop,0.08,0.055,0.02,g,16); e.rotation.x=Math.PI/2;
+  g.traverse(o=>{ if(o.isMesh) o.userData.station=2; }); e.userData.estop=true; clickables.push(g);
+}
+
+/* =============== conveyor: esteiras 1 e 2 por bancada + esteiras de giro nas extremidades =============== */
+function beltTexture(){
+  const c=document.createElement('canvas'); c.width=64; c.height=64; const g=c.getContext('2d');
+  g.fillStyle='#161819'; g.fillRect(0,0,64,64); g.fillStyle='#24272a'; g.fillRect(0,0,5,64);
+  const t=tex(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+}
+const beltTex = beltTexture();
+function ribbon(off1, off2, y1, y2, mat, uvScale=1, s0=0, s1=P, N=520){
+  const pos=[], uv=[], idx=[];
+  for(let i=0;i<=N;i++){
+    const s=s0+(s1-s0)*i/N, f=loopFrame(s), nx=-f.tz, nz=f.tx;
+    pos.push(f.x+nx*off1, y1, f.z+nz*off1,  f.x+nx*off2, y2, f.z+nz*off2);
+    uv.push(s*uvScale, 0, s*uvScale, 1);
+    if(i<N){ const a=i*2; idx.push(a,a+1,a+2, a+1,a+3,a+2); }
+  }
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  geo.setIndex(idx); geo.computeVertexNormals();
+  mat.side = THREE.DoubleSide;
+  const m=new THREE.Mesh(geo,mat); m.castShadow=m.receiveShadow=true; scene.add(m); return m;
+}
+const beltMat = new THREE.MeshStandardMaterial({ map:beltTex, roughness:.85 });
+ribbon(W/2, -W/2, BELT_Y, BELT_Y, beltMat, 14, 0, 2*L, 200);
+ribbon(W/2, -W/2, BELT_Y, BELT_Y, beltMat, 14, 2*L+Math.PI*R, 4*L+Math.PI*R, 200);
+const railMat = std(0xbfc5ca,{roughness:.35,metalness:.8});
+// laterais em chapa/perfil de alumínio + guias superiores em perfil H preto 45x25
+ribbon(W/2+0.006, W/2+0.006, BELT_Y-0.002, BELT_Y-0.058, railMat);
+ribbon(-W/2-0.006, -W/2-0.006, BELT_Y-0.002, BELT_Y-0.058, railMat);
+ribbon(W/2+0.006, -W/2-0.006, BELT_Y-0.058, BELT_Y-0.058, std(0x2b2e31));
+const guideM = std(0x16181a,{roughness:.45,metalness:.3});
+ribbon(W/2+0.004, W/2+0.004, BELT_Y+0.022, BELT_Y-0.002, guideM);
+ribbon(-W/2-0.004, -W/2-0.004, BELT_Y+0.022, BELT_Y-0.002, guideM);
+ribbon(W/2+0.004, W/2+0.014, BELT_Y+0.022, BELT_Y+0.022, guideM);
+ribbon(-W/2-0.004, -W/2-0.014, BELT_Y+0.022, BELT_Y+0.022, guideM);
+ribbon(W/2+0.014, W/2+0.014, BELT_Y+0.022, BELT_Y+0.004, guideM);
+ribbon(-W/2-0.014, -W/2-0.014, BELT_Y+0.022, BELT_Y+0.004, guideM);
+// esteiras de giro (rotating discs at both ends)
+const turntables = [];
+for (const sx of [-1,1]){
+  const g = new THREE.Group(); g.position.set(sx*L, BELT_Y, ZC); scene.add(g);
+  const disc = cyl(R+W/2+0.004, R+W/2+0.004, 0.006, std(0xd9dde0,{roughness:.35,metalness:.3}), 0, -0.003, 0, g, 48);
+  cyl(0.02,0.02,0.008,M.aluDark,0,0.001,0,g,16);
+  cyl(0.03,0.03,0.08,M.black,0,-0.05,0,g,16);
+  turntables.push({ disc, dir:sx });
+}
+for (const x of [-0.75,-0.15,0.75]) for (const z of [ZB,ZFR]) box(0.006, 0.06, W+0.025, M.black, x, BELT_Y-0.022, z);
+for (const b of BENCH) for (const z of [ZB,ZFR]) {
+  for (const dx of [-b.w/2+0.06, b.w/2-0.06]) profile(BELT_Y-0.058-TABLE_Y, 0.03, 0.03, 'y', b.cx+dx, (BELT_Y-0.058+TABLE_Y)/2, z, scene);
+  // motorredutor 24 V / 33 rpm em cada esteira
+  const mx = b.cx + b.w/2 - 0.12, my = BELT_Y - 0.085;
+  box(0.05,0.04,0.045,M.smcBody,mx,my,z);
+  const mot = cyl(0.019,0.019,0.075,M.motor,mx-0.062,my,z); mot.rotation.z=Math.PI/2;
+  box(0.012,0.012,0.03,M.motor,mx-0.06,my+0.024,z);
+}
+// suportes de conectores das esteiras (acrílico) e régua de bornes
+for (const b of BENCH) box(0.12,0.05,0.004,std(0xdfeef5,{transparent:true,opacity:.5}),b.cx-b.w/2+0.12,BELT_Y-0.04,ZFR+W/2+0.012);
+
+/* =============== Smart Block (bloco com ranhuras, pinos de empilhamento), lâminas com desenhos, tampa =============== */
+const BW = 0.06, BH = 0.034, BT = 0.004, TAMPA_H = 0.01;
+const LAM_H = 0.024, LAM_W = 0.046, LAM_T = 0.0016;
+const blockGeo = (()=>{
+  const parts=[]; const bx=(w,h,d,x,y,z)=>{ const g=new THREE.BoxGeometry(w,h,d); g.translate(x,y,z); parts.push(g); };
+  bx(BW, 0.004, BW, 0, 0.002, 0);                                 // fundo
+  bx(BW, BH, BT, 0, BH/2, -BW/2+BT/2);                            // parede traseira (fechada)
+  const frame = (alongX, off) => {                                 // paredes com janela para a lâmina
+    const L2 = BW, post = 0.007;
+    if (alongX){ bx(L2,0.005,BT,0,BH-0.0025,off); bx(L2,0.006,BT,0,0.003+0.004,off); bx(post,BH,BT,-BW/2+post/2,BH/2,off); bx(post,BH,BT,BW/2-post/2,BH/2,off); }
+    else { bx(BT,0.005,L2,off,BH-0.0025,0); bx(BT,0.006,L2,off,0.003+0.004,0); bx(BT,BH,post,off,BH/2,-BW/2+post/2); bx(BT,BH,post,off,BH/2,BW/2-post/2); }
+  };
+  frame(false, -BW/2+BT/2); frame(false, BW/2-BT/2); frame(true, BW/2-BT/2);
+  for (const sx of [-1,1]) for (const sz of [-1,1]){ const c=new THREE.CylinderGeometry(0.0032,0.0032,0.008,10); c.translate(sx*(BW/2-0.006), BH+0.004, sz*(BW/2-0.006)); parts.push(c); }
+  return mergeGeometries(parts.map(g=>g.toNonIndexed()));
+})();
+const tampaGeo = new RoundedBoxGeometry(BW+0.002, TAMPA_H, BW+0.002, 2, 0.003);
+const lamGeo = new THREE.BoxGeometry(LAM_T, LAM_H, LAM_W);      // plane faces ±x
+const WALL = [ { name:'esquerda', x:-BW/2+BT/2, z:0, ry:0 }, { name:'frontal', x:0, z:BW/2-BT/2, ry:Math.PI/2 }, { name:'direita', x:BW/2-BT/2, z:0, ry:0 } ];
+const lamMatCache = {};
+function drawIcon(g, model, stroke){
+  g.strokeStyle=stroke; g.lineWidth=4; g.lineJoin='round'; g.beginPath();
+  if (model==='casa'){ g.rect(44,30,40,30); g.moveTo(38,32); g.lineTo(64,8); g.lineTo(90,32); g.rect(58,42,12,18); g.moveTo(74,16); g.lineTo(74,10); g.lineTo(80,10); g.lineTo(80,21); }
+  else if (model==='barco'){ g.moveTo(26,40); g.lineTo(102,40); g.lineTo(88,58); g.lineTo(38,58); g.closePath(); g.rect(46,26,36,14); g.rect(54,12,7,14); g.rect(66,12,7,14); g.moveTo(54,49); g.arc(52,49,3,0,7); g.moveTo(67,49); g.arc(65,49,3,0,7); g.moveTo(80,49); g.arc(78,49,3,0,7); }
+  else { for(let i=0;i<10;i++){ const a=-Math.PI/2+i*Math.PI/5, r=i%2?11:26; const x=64+Math.cos(a)*r, y=35+Math.sin(a)*r; i?g.lineTo(x,y):g.moveTo(x,y); } g.closePath(); }
+  g.stroke();
+}
+function lamMat(color, model){
+  const key=color+model; if (lamMatCache[key]) return lamMatCache[key];
+  const c=document.createElement('canvas'); c.width=128; c.height=68; const g=c.getContext('2d');
+  g.fillStyle=hex(LAM_COL[color]); g.fillRect(0,0,128,68);
+  drawIcon(g, model, color==='preto'||color==='azul'||color==='verde' ? '#f4f4f4' : '#141414');
+  const face = new THREE.MeshStandardMaterial({ map:tex(c), roughness:.35 });
+  const side = std(LAM_COL[color],{roughness:.35});
+  return lamMatCache[key] = [face, face, side, side, side, side];
+}
+function makeLam(color, model){ const m=new THREE.Mesh(lamGeo, lamMat(color, model)); m.castShadow=true; m.userData={ color, model }; return m; }
+const clickBlocks = [];
+let blockSeq = 0;
+function makeBlock(color){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(blockGeo, BLOCK_MAT[color]); body.castShadow = body.receiveShadow = true; g.add(body);
+  const blk = { id:++blockSeq, g, color, order:null, floor:0, s:0, state:'off', target:null, lam:[null,null,null], rfid:'Base em estoque', tampa:false };
+  body.userData.blockRef = blk;
+  clickBlocks.push(body);
+  return blk;
+}
+function makeTampa(){ const t=new THREE.Mesh(tampaGeo, M.tampa); t.castShadow=true; return t; }
+
+/* =============== belt traffic =============== */
+const belt = [];
+const V = 0.14, GAP = 0.08, QUEUE = 0.14;
+function placeOnBelt(b){ const f=loopFrame(b.s); b.g.position.set(f.x, BELT_Y, f.z); b.g.rotation.set(0, Math.atan2(-f.tz, f.tx), 0); }
+function putOnBelt(b, s, target){ scene.attach(b.g); b.s=s; b.state='held'; b.target=target; if(!belt.includes(b)) belt.push(b); placeOnBelt(b); }
+function takeOffBelt(b){ const i=belt.indexOf(b); if(i>=0) belt.splice(i,1); b.state='off'; }
+function spaceFree(s, gap=0.1){ return belt.every(b=>{ const d=Math.abs((((b.s-s)%P)+P+P/2)%P - P/2); return d>gap; }); }
+
+/* =============== stoppers + RFID antennas =============== */
+function stopper(x){
+  // dois stoppers pneumáticos (SMC CJ1) com lâmina que sobe ao lado da pista
+  const pins = [];
+  for (const dx of [BW/2+0.014, -BW/2-0.09]){
+    const g=new THREE.Group(); g.position.set(x+dx, BELT_Y, ZB); scene.add(g);
+    const cylB = cyl(0.007,0.007,0.04,M.smcBody,0,-0.04,-W/2-0.022,g,14);
+    box(0.016,0.012,0.02,M.aluDark,0,-0.016,-W/2-0.022,g);
+    const pin=box(0.006,0.018,0.03,M.smcEnd,0,-0.012,-W/2+0.004,g);
+    pins.push({ pin, main: dx>0 });
+  }
+  return { set(on){ pins.forEach(p=>{ p.pin.position.y = on ? 0.012 : -0.012; }); } };
+}
+function antenna(x){ box(0.04,0.018,0.04,M.smcBody,x,BELT_Y-0.03,ZB-W/2-0.03); box(0.06,0.006,0.045,M.dark,x,BELT_Y-0.065,ZB); const led=new THREE.MeshStandardMaterial({ color:0x5aa9e6, emissive:0x5aa9e6, emissiveIntensity:0 }); box(0.012,0.008,0.004,led,x+0.025,BELT_Y-0.028,ZB+W/2+0.014); return led; }
+
+/* =============== motion runner =============== */
+const ease = u => u*u*(3-2*u);
+class Runner {
+  constructor(pose, apply){ this.pose=pose; this.apply=apply; this.q=[]; this.cur=null; this.apply(pose); }
+  add(...steps){ this.q.push(...steps.flat()); }
+  front(steps){ this.q.unshift(...steps); }
+  get busy(){ return !!this.cur || this.q.length>0; }
+  step(dt){
+    let guard=0;
+    while(!this.cur && this.q.length && guard++<80){
+      const s=this.q[0];
+      if (s.do){ this.q.shift(); s.do(); continue; }
+      if (s.until){ if (s.until(dt)) { this.q.shift(); continue; } this.apply(this.pose); return; }
+      this.q.shift(); const to=s.to, from={}; if (to) for (const k in to) from[k]=this.pose[k];
+      this.cur={ s, to, t:0, from };
+    }
+    if (!this.cur){ this.apply(this.pose); return; }
+    const c=this.cur; c.t+=dt; const u = c.s.t>0 ? Math.min(1, c.t/c.s.t) : 1, e=ease(u);
+    if (c.to) for (const k in c.to) this.pose[k] = c.from[k] + (c.to[k]-c.from[k])*e;
+    this.apply(this.pose);
+    if (u>=1) this.cur=null;
+  }
+}
+const mv = (to, t=0.6) => ({ to, t });
+const mvf = (fn, t=0.6) => ({ get to(){ return fn(); }, t });
+const wait = t => ({ t });
+const act = fn => ({ do:fn });
+const until = fn => ({ until:fn });
+
+/* =============== MES / loja =============== */
+const S = { running:true, estop:false, speed:2, simT:0, done:0, leads:[], auto:true, qc:true, belt:true };
+const orders = []; let orderSeq = 248;
+const logList = document.getElementById('logList');
+const clock2 = t => `${String(Math.floor(t/60)).padStart(2,'0')}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+function log(msg){ const li=document.createElement('li'); li.innerHTML=`<time>${clock2(S.simT)}</time><span>${msg}</span>`; logList.prepend(li); while(logList.children.length>9) logList.lastChild.remove(); }
+const rnd = a => a[Math.floor(Math.random()*a.length)];
+const randomFloor = () => ({ block:rnd(['preto','preto','vermelho','azul']), lam:[0,1,2].map(()=>({ c:rnd(Object.keys(LAM_COL)), m:rnd(MODELS) })) });
+function newOrder(floors, manual){
+  const o = { id:++orderSeq, floors, status:'Planejada', t0:null, released:0 };
+  orders.push(o); renderOrders();
+  log(`${manual?'Loja (manual)':'Loja virtual'}: OP${o.id} · ${floors.length} andar(es)`);
+  return o;
+}
+function autoOrder(){ const n = rnd([1,1,1,2,2,3]); newOrder(Array.from({length:n}, randomFloor), false); }
+const stations = [];
+const deposit = { key:null, items:[null,null,null], redo:[] };   // depósito de lâminas do lado direito do processo
+const procTasks = [];
+
+
+
+const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(obj.getWorldPosition(new THREE.Vector3())); };
+
+/* ---------- 1 · ESTOQUE : LERH50K (giro) + LEFS16B-250 (sobe/desce) + cilindro posicionador + MHZL2-16D + alimentador MY1B ---------- */
+{
+  const b = BENCH[0], g = benches[0];
+  const COL_Z = -0.12, RMAG = 0.22, DELIV_Z = 0.10;
+  const LEVELS = [0,1,2,3].map(l => BELT_Y + 0.075 + (3-l)*0.058);    // posição 0 = nível superior, à esquerda
+  const PHI = [0,1,2,3,4,5,6].map(k => (200 + k*(140/6)) * Math.PI/180);
+  const a0 = 190*Math.PI/180, a1 = 350*Math.PI/180;
+  const shape = new THREE.Shape();
+  shape.absarc(0,0,RMAG+0.05,a0,a1,false); shape.absarc(0,0,RMAG-0.042,a1,a0,true);
+  const trayGeo = new THREE.ExtrudeGeometry(shape,{depth:0.004,bevelEnabled:false,curveSegments:48}); trayGeo.rotateX(Math.PI/2);
+  const trayM = std(0x26292d,{roughness:.55});
+  for (const y of LEVELS){
+    const tr = new THREE.Mesh(trayGeo, trayM); tr.position.set(0, y, COL_Z); tr.castShadow=tr.receiveShadow=true; g.add(tr);
+    for (let k=0;k<7;k++){ const a=PHI[k]; for (const da of [-0.105,0.105]){ const aa=a+da; const d=box(0.004,0.008,0.05,M.black,Math.cos(aa)*RMAG,y+0.004,COL_Z+Math.sin(aa)*RMAG,g); d.rotation.y=-aa; d.castShadow=false; } box(0.012,0.012,0.004,M.black,Math.cos(a)*(RMAG+0.036),y+0.006,COL_Z+Math.sin(a)*(RMAG+0.036),g).rotation.y=-a+Math.PI/2; }
+  }
+  // estrutura do magazine: perfis 30x30 atrás + mãos-francesas
+  for (const a of [a0+0.06, (a0+a1)/2, a1-0.06]){ const x=Math.cos(a)*(RMAG+0.07), z=COL_Z+Math.sin(a)*(RMAG+0.07); profile(LEVELS[0]-TABLE_Y+0.02, 0.03, 0.03, 'y', x, (LEVELS[0]+TABLE_Y)/2+0.01, z, g); for (const y of LEVELS){ const s=box(0.03,0.006,0.04,M.aluDark,Math.cos(a)*(RMAG+0.05),y-0.005,COL_Z+Math.sin(a)*(RMAG+0.05),g); s.rotation.y=-a+Math.PI/2; } }
+  // giro (LERH50K) e coluna (LEFS16B-250 vertical)
+  const rt = lerh(); rt.g.position.set(0, TABLE_Y, COL_Z); rt.g.rotation.y = Math.PI/2; g.add(rt.g);
+  const colRot = new THREE.Group(); colRot.position.set(0, TABLE_Y+0.052, COL_Z); g.add(colRot);
+  box(0.08,0.008,0.07,M.aluDark,0,0.004,0,colRot);
+  const vz = lefs(0.25, 1); vz.g.rotation.set(0, Math.PI, Math.PI/2); vz.g.position.set(-0.045, 0.008 + 0.25/2 + 0.07, 0); colRot.add(vz.g);
+  for (let i=0;i<9;i++) box(0.022,0.03,0.03,M.chain,-0.085,0.05+i*0.033,0.0,colRot).castShadow=false;
+  // braço: cilindro posicionador (guiado) + garra MHZL2-16D com dedos extensores
+  const armG = new THREE.Group(); colRot.add(armG);
+  box(0.012,0.05,0.056,M.aluDark,0.008,0.0,0,armG);
+  box(0.075,0.03,0.05,M.smcBody,0.0525,0.0,0,armG);
+  box(0.075,0.003,0.04,M.smcSeal,0.0525,0.0165,0,armG).castShadow=false;
+  const posi = new THREE.Group(); armG.add(posi);
+  const posRods = [-0.012,0.012].map(dz=>{ const c=cyl(0.004,0.004,1,M.rod,0,0,dz,armG,10); c.rotation.z=Math.PI/2; return c; });
+  box(0.01,0.04,0.05,M.smcBody,0,0,0,posi);
+  const grip = mhzl2(); grip.g.rotation.y = Math.PI/2; grip.g.position.set(0.0, -0.006, 0); posi.add(grip.g);
+  const tip = new THREE.Object3D(); tip.position.set(0.05, -0.028, 0); posi.add(tip);
+  // posição de entrega, rampa até a esteira e alimentador MY1B com ventosa ZPT25
+  box(0.07,0.004,0.12,M.black,0,BELT_Y-0.002,DELIV_Z+0.02,g);
+  for (const sx of [-1,1]) box(0.004,0.012,0.12,M.black,sx*0.038,BELT_Y+0.004,DELIV_Z+0.02,g);
+  const feeder = my1b(0.25); feeder.g.position.set(0.06, TABLE_Y, 0.03); g.add(feeder.g);
+  const bracket = new THREE.Group(); feeder.car.add(bracket);
+  box(0.012,BELT_Y-TABLE_Y-0.02,0.03,M.aluDark,0,(BELT_Y-TABLE_Y)/2+0.02,0,bracket);
+  box(0.06,0.012,0.03,M.aluDark,-0.03,BELT_Y-TABLE_Y+0.012,0,bracket);
+  vacuumCup(bracket, -0.06, BELT_Y-TABLE_Y+BH/2-0.004, 0.015, 'z');
+  const cupZ = f => 0.065 + f*(ZB - BW/2 - 0.065);
+  const stopX = b.cx, stp = stopper(stopX), led = antenna(stopX);
+  // calibração da cinemática (posições reais das peças no modelo)
+  vz.set(0); armG.position.set(0, 0, 0); posi.position.x = 0.12;
+  const tip0 = lp(tip, colRot);
+  const posiX = r => r - tip0.x + 0.12;                                    // raio da garra → posição do posicionador
+  const yToArm = y => y - (TABLE_Y + 0.052) - tip0.y;                     // altura do centro do bloco → altura do braço
+  const pose = { phi:Math.PI/2, y:BELT_Y+0.12, r:0.15, gw:0.045, f:0 };
+  let held = null, pushing = null;
+  const run = new Runner(pose, p=>{
+    colRot.rotation.y = -p.phi; rt.table.rotation.y = -p.phi - Math.PI/2;
+    const ay = yToArm(p.y); armG.position.y = ay;
+    vz.set(ay - vz.g.position.y + 0.125 + 0.02);
+    const px = posiX(p.r); posi.position.x = px; posRods.forEach(c=>{ c.scale.y=Math.max(0.005,px-0.09); c.position.x = (0.09+px)/2; });
+    grip.set(p.gw);
+    const cz = cupZ(p.f); feeder.set(cz - 0.03 - 0.026);
+    if (held) follow(held.g, tip, BH/2, -p.phi);
+    if (pushing) pushing.g.position.z = g.position.z + Math.max(DELIV_Z, cz + BW/2);
+  });
+  const f = { stop:false, fwd:false, back:false, vac:false, rfid:'' };
+  const mag = new Array(28).fill(null);
+  const slotPos = i => { const l=Math.floor(i/7), k=i%7, phi=PHI[k]; return { x:Math.cos(phi)*RMAG, z:COL_Z+Math.sin(phi)*RMAG, y:LEVELS[l], phi }; };
+  const putMag = (i,color) => { const blk=makeBlock(color); const p=slotPos(i); g.add(blk.g); blk.g.position.set(p.x,p.y,p.z); blk.g.rotation.y = -p.phi; mag[i]=blk; blk.rfid=`Estoque · posição ${i}`; };
+  'preto,vermelho,azul,preto,preto,azul,vermelho,preto,vermelho,azul,preto,azul,preto,vermelho,preto,azul,vermelho,preto,preto,vermelho,azul,preto,azul,preto,preto,vermelho'.split(',').forEach((c,i)=>putMag(i,c));
+  const OPEN = 0.045, CLOSED = BW/2 + 0.003, RIN = 0.15;
+  const st = {
+    name:'Estoque', run, f, mag, cur:null,
+    desc:'Reserva e disponibiliza a matéria-prima. Para cada andar do pedido, o manipulador retira uma base da cor pedida do magazine em arco e a deixa na posição de entrega: mesa giratória elétrica LERH50K, atuador elétrico sobe/desce LEFS16B-250, cilindro posicionador e garra MHZL2-16D com dedos extensores. O alimentador (cilindro sem haste MY1B com ventosa ZPT25) empurra a base para a esteira, entre os stoppers, e a antena RFID grava a OP na tag.',
+    kit:'CLP S7-1200 · IHM KTP700 · SMC LERH50K (giro, 10 N·m) · SMC LEFS16B-250 (sobe/desce) · cilindro posicionador · garra SMC MHZL2-16D · alimentador SMC MY1B 250 mm + ventosa ZPT25 · stoppers CJ1 · RFID IO-Link · magazine de 28 posições',
+    msg:'Aguardando OP', prog:0,
+    busy(){ return run.busy; },
+    detail(){ return `${mag.filter(Boolean).length}/28 bases no magazine`; },
+    update(){
+      stp.set(f.stop); led.emissiveIntensity = f.rfid ? 2 + Math.sin(S.simT*20) : 0;
+      if (run.busy) return;
+      if (this.cur){
+        const o=this.cur;
+        if (o.released >= o.floors.length){ o.status='Esteira'; renderOrders(); this.cur=null; this.msg='Aguardando OP'; return; }
+        if (!spaceFree(sAt(stopX), 0.12)){ this.msg='Aguardando esteira livre'; return; }
+        const k = o.released, color = o.floors[k].block;
+        let i = mag.findIndex(m=>m && m.color===color);
+        if (i<0){ let n=0; mag.forEach((m,j)=>{ if(!m && n<6){ putMag(j,color); n++; } }); log(`Estoque: sem base ${color}, operador repôs ${n} pelo gestor de estoque`); i = mag.findIndex(m=>m && m.color===color); }
+        this.retrieve(o, k, i);
+        return;
+      }
+      const active = orders.filter(o=>!['Planejada','Concluída'].includes(o.status)).length;
+      const o = orders.find(o=>o.status==='Planejada');
+      if (!o){ this.msg='Aguardando OP'; return; }
+      if (active >= 2){ this.msg='Aguardando: 2 OPs já em produção'; return; }
+      this.cur = o; o.status='Estoque'; o.t0=S.simT; renderOrders();
+      o.floors.forEach((fl,k)=>procTasks.push({ key:`${o.id}-${k}`, o, k, fl }));
+      log(`MES: OP${o.id} iniciada no estoque`);
+    },
+    retrieve(o, k, i){
+      const p = slotPos(i), blk = mag[i]; mag[i]=null;
+      blk.order = o; blk.floor = k;
+      const N = o.floors.length, mid = p.y + BH/2;
+      this.msg = `Andar ${k+1}/${N}: retirando base ${blk.color} da posição ${i}`; this.prog=0;
+      run.add(
+        mv({ r:RIN, gw:OPEN }, 0.3), mv({ y:mid+0.004 }, 0.7), mv({ phi:p.phi }, 1.1),
+        mv({ r:RMAG }, 0.6), mv({ gw:CLOSED }, 0.25),
+        act(()=>{ scene.attach(blk.g); held=blk; this.prog=.25; }),
+        mv({ y:mid+0.012 }, 0.25), mv({ r:RIN }, 0.6),
+        mv({ y:BELT_Y+BH/2+0.012 }, 0.8), mv({ phi:Math.PI/2 }, 1.0), mv({ r:RMAG }, 0.6), mv({ y:BELT_Y+BH/2 }, 0.25),
+        mv({ gw:OPEN }, 0.25), act(()=>{ held=null; place(g, blk.g, 0, BELT_Y, DELIV_Z, 0); this.msg='Alimentador empurra a base para a esteira'; this.prog=.6; }),
+        mv({ r:RIN }, 0.5),
+        act(()=>{ f.stop=true; f.fwd=true; scene.attach(blk.g); pushing = blk; }), wait(0.15),
+        mv({ f:1 }, 0.9),
+        act(()=>{ pushing=null; f.fwd=false; putOnBelt(blk, sAt(stopX), 'M'); f.rfid='Escrevendo'; this.msg=`RFID: gravando OP${o.id} · andar ${k+1}/${N}`; this.prog=.8; }),
+        act(()=>{ f.back=true; }), mv({ f:0 }, 0.8), act(()=>{ f.back=false; }), wait(0.8),
+        act(()=>{ f.rfid=''; f.stop=false; blk.state='move'; blk.rfid=`OP${o.id} · andar ${k+1} de ${N} · a caminho da montagem`; o.released++; log(`Estoque: base do andar ${k+1} da OP${o.id} liberada (RFID gravado)`); this.prog=1; }),
+        mv({ y:BELT_Y+0.12 }, 0.5), act(()=>{ this.prog=0; })
+      );
+    },
+    io(){ return [
+      ['sec','Entradas CLP'],
+      ['I','%I0.1','Emergência OK', !S.estop],
+      ['I','%I0.2','Alimentador avançado', pose.f>0.97],
+      ['I','%I0.3','Alimentador em posição de entrega', pose.f<0.03 && !!pushing],
+      ['I','%I0.4','Alimentador recuado', pose.f<0.03],
+      ['I','%I0.5','Garra aberta', pose.gw>OPEN-0.001],
+      ['I','%I0.6','Garra fechada', pose.gw<CLOSED+0.001],
+      ['I','%I0.7','Posicionador avançado', pose.r>RMAG-0.003],
+      ['I','%I1.0','Posicionador recuado', pose.r<RIN+0.003],
+      ['sec','Saídas CLP'],
+      ['Q','%Q0.0','Avança alimentador', f.fwd],
+      ['Q','%Q0.1','Recua alimentador', f.back],
+      ['Q','%Q0.3','Avança cilindro posicionador', pose.r>(RIN+RMAG)/2],
+      ['Q','%Q0.4','Fecha garra', pose.gw<(OPEN+CLOSED)/2],
+      ['Q','%Q0.5','Motor esteira 1 e giro', S.belt],
+      ['Q','%Q0.6','Motor esteira 2', S.belt],
+      ['Q','%Q0.7','Válvula 1 do stopper', f.stop],
+      ['Q','%Q1.0','Válvula 2 do stopper', f.stop],
+      ['sec','Drives e IO-Link'],
+      ['A','LERH50K','Giro', (pose.phi*180/Math.PI).toFixed(0)+'°'],
+      ['A','LEFS16B','Sobe/desce', ((pose.y-BELT_Y)*1000).toFixed(0)+' mm'],
+      ['A','C/Q1','Antena RFID', f.rfid||'Livre'],
+    ]; }
+  };
+  stations.push(st);
+}
+
+/* ---------- 2 · PROCESSO : LEFS16RB-400 (X) + LEYG16MB-150 (Y) + cilindro mini ISO Ø12 com guia (Z) + ventosa 25 mm ---------- */
+{
+  const b = BENCH[1], g = benches[1];
+  const LCOL = Object.keys(LAM_COL);
+  const MAG_Z = -0.14, SLOT_X = i => -0.19 + i*0.022;               // 6 cores × 3 desenhos = 18 posições
+  const DEP_X = 0.215, DEP_Z = [-0.11, -0.055, 0.0];                 // depósito do lado direito (pega do robô)
+  const COMB_Y = TABLE_Y + 0.014, LAM_Y = COMB_Y + LAM_H/2, LAM_TOP = COMB_Y + LAM_H;
+  // magazine das lâminas (pentes)
+  box(0.42, 0.014, 0.06, M.black, 0.0, TABLE_Y+0.007, MAG_Z, g);
+  for (let i=0;i<=18;i++) box(0.002, 0.02, 0.055, M.black, SLOT_X(i)-0.011, COMB_Y+0.01, MAG_Z, g).castShadow=false;
+  const slots = [];
+  LCOL.forEach((c,ci)=>MODELS.forEach((m,mi)=>{ const i=ci*3+mi; const l=makeLam(c,m); l.position.set(SLOT_X(i), LAM_Y, MAG_Z); g.add(l); slots[i]=l; }));
+  // base para gravação das lâminas (item 7 do manual)
+  box(0.07,0.014,0.06,M.black,-0.255,TABLE_Y+0.007,MAG_Z,g);
+  for (let i=0;i<4;i++) box(0.002,0.02,0.055,M.black,-0.28+i*0.017,COMB_Y+0.01,MAG_Z,g).castShadow=false;
+  // depósito do lado direito
+  box(0.05,0.014,0.17,M.black,DEP_X,TABLE_Y+0.007,-0.055,g);
+  DEP_Z.forEach(z=>{ for (const dx of [-0.005,0.005]) box(0.002,0.02,0.05,M.black,DEP_X+dx,COMB_Y+0.01,z,g).castShadow=false; });
+  // pórtico em perfis 30x30 / 30x60 (BOM: perfil escora 30x30, perfil 30x60)
+  const BY = TABLE_Y + 0.38, BZ = -0.40;
+  for (const x of [-0.285,0.285]) { profile(BY-TABLE_Y, 0.03, 0.03, 'y', x, (BY+TABLE_Y)/2, BZ, g); profile(BY-TABLE_Y-0.06, 0.03, 0.03, 'y', x, (BY+TABLE_Y-0.06)/2, BZ+0.16, g); profile(0.19, 0.03, 0.03, 'z', x, BY-0.045, BZ+0.08, g); box(0.04,0.04,0.004,M.aluDark,x,BY-0.01,BZ+0.16,g); }
+  profile(0.6, 0.03, 0.06, 'x', 0, BY, BZ, g);
+  box(0.6,0.003,0.12,std(0xcfe3ef,{transparent:true,opacity:.25,depthWrite:false}),0,BY+0.06,BZ+0.03,g).castShadow=false;   // proteção em acrílico do atuador
+  // eixo X: SMC LEFS16RB-400 na face frontal da travessa
+  const ax = lefs(0.40, -1); ax.g.rotation.x = Math.PI/2; ax.g.position.set(0, BY, BZ+0.017); g.add(ax.g);
+  for (let i=0;i<14;i++) box(0.03,0.02,0.03,M.chain,-0.24+i*0.032,BY+0.045,BZ-0.005,g).castShadow=false;
+  // carro X → eixo Y: SMC LEYG16MB-150 (haste com guia), avançando para a frente
+  const xg = new THREE.Group(); g.add(xg);
+  box(0.06,0.06,0.012,M.aluDark,0,BY,BZ+0.071,xg);
+  box(0.06,0.012,0.12,M.aluDark,0,BY-0.036,BZ+0.12,xg);
+  const ay = leyg(0.15); ay.g.position.set(0, BY-0.066, -0.27); xg.add(ay.g);
+  // eixo Z: cilindro mini ISO Ø12 com guia linear de buchas + ventosa 25 mm com 40 mm de curso (amortecida)
+  const az = isoGuided(0.1); az.g.position.set(0, -0.02, 0.035); ay.plate.add(az.g);
+  box(0.06,0.012,0.04,M.aluDark,0,-0.006,0.025,ay.plate);
+  const cupG = vacuumCup(az.mov, 0, -0.03, 0, 'y');
+  const tip = new THREE.Object3D(); tip.position.y = -0.042; az.mov.add(tip);
+  // calibração
+  xg.position.x = 0; ax.set(0.2); ay.set(0); az.set(0);
+  const t0 = lp(tip, g);
+  ay.g.position.y += (LAM_TOP + 0.09) - t0.y;                        // Z recuado = 90 mm acima das lâminas
+  const tz0 = t0.z;
+  { const top = ay.g.position.y + 0.022, h = (BY-0.042) - top; if (h>0.005) box(0.05, h, 0.012, M.aluDark, 0, top + h/2, -0.30, xg); }                                                   // posição Y com curso 0
+  const ZUP = LAM_TOP + 0.09;
+  const pose = { x:0, z:-0.07, y:ZUP };
+  let held = null;
+  const run = new Runner(pose, p=>{
+    xg.position.x = p.x; ax.set(0.2 + p.x);
+    ay.set(p.z - tz0); az.set(ZUP - p.y);
+    if (held) follow(held, tip, LAM_H/2, 0);
+  });
+  const f = { zdown:false, vac:false };
+  const zDown = () => [ act(()=>{ f.zdown=true; }), mv({ y:LAM_TOP }, 0.3) ];
+  const zUp = () => [ act(()=>{ f.zdown=false; }), mv({ y:ZUP }, 0.3) ];
+  const pickPlace = (c, m, j, wrong) => {
+    const si = LCOL.indexOf(c)*3 + MODELS.indexOf(m); let lam;
+    return [
+      mv({ x:SLOT_X(si), z:MAG_Z }, 0.9), ...zDown(),
+      act(()=>{ lam = slots[si]; if (wrong){ const wc = rnd(LCOL.filter(x=>x!==c)); lam.material = lamMat(wc, m); lam.userData.color = wc; } f.vac=true; scene.attach(lam); held=lam; }), wait(0.2),
+      ...zUp(),
+      act(()=>{ const nl=makeLam(c,m); nl.position.set(SLOT_X(si), LAM_Y, MAG_Z); g.add(nl); slots[si]=nl; }),
+      mv({ x:DEP_X, z:DEP_Z[j] }, 0.9), ...zDown(),
+      act(()=>{ f.vac=false; held=null; place(g, lam, DEP_X, LAM_Y, DEP_Z[j], 0); deposit.items[j] = { mesh:lam, color:lam.userData.color, model:m }; }),
+      ...zUp(),
+    ];
+  };
+  const st = {
+    name:'Processo', run, f, task:null,
+    desc:'Separa as lâminas de acabamento do pedido: cores azul, vermelho, branco, preto, amarelo e verde, com os desenhos escolhidos na loja. O atuador elétrico X (SMC LEFS16RB-400), o atuador elétrico Y com haste guiada (SMC LEYG16MB-150) e o eixo Z pneumático (cilindro mini ISO Ø12 com guia de buchas e ventosa de 25 mm) levam 3 lâminas por andar do magazine ao depósito do lado direito. As lâminas do andar seguinte só são separadas depois que o robô retirou as do andar anterior.',
+    kit:'CLP S7-1200 · IHM KTP700 · SMC LEFS16RB-400 (eixo X) · SMC LEYG16MB-150 (eixo Y) · cilindro mini ISO Ø12 × 100 com guia linear (eixo Z) · ventosa 25 mm amortecida + vacuostato · magazine de lâminas (6 cores × 3 desenhos) · base para gravação das lâminas',
+    msg:'Aguardando OP', prog:0,
+    busy(){ return run.busy; },
+    detail(){ return this.task ? `OP${this.task.o.id} · andar ${this.task.k+1}` : (deposit.key ? 'Depósito ocupado' : 'Depósito livre'); },
+    update(){
+      if (run.busy) return;
+      if (deposit.redo.length){
+        const j = deposit.redo.shift(), t = this.task; const want = t.fl.lam[j];
+        this.msg = `Reposição: lâmina ${WALL[j].name} ${want.c}/${want.m}`;
+        run.add(pickPlace(want.c, want.m, j, false), mv({ x:0, z:-0.07 }, 0.7));
+        log(`Processo: repondo a lâmina ${WALL[j].name} da OP${t.o.id}`);
+        return;
+      }
+      if (deposit.key || !procTasks.length){ this.msg = deposit.key ? 'Aguardando o robô retirar as lâminas' : 'Aguardando OP'; return; }
+      const t = procTasks.shift(); this.task = t; deposit.key = t.key; deposit.items=[null,null,null];
+      t.fl.lam.forEach((l,j)=>{
+        const wrong = S.qc && Math.random() < 0.08;
+        run.add(act(()=>{ this.msg=`Andar ${t.k+1}: lâmina ${WALL[j].name} ${l.c} · ${l.m}`; this.prog=j/3; }), pickPlace(l.c, l.m, j, wrong));
+      });
+      run.add(act(()=>{ this.prog=1; log(`Processo: lâminas do andar ${t.k+1} da OP${t.o.id} no depósito`); }), mv({ x:0, z:-0.07 }, 0.8), act(()=>{ this.prog=0; }));
+    },
+    io(){ return [
+      ['sec','Entradas CLP'],
+      ['I','%I0.1','Emergência', !S.estop],
+      ['I','%I0.2','Eixo Z avançado', pose.y < LAM_TOP+0.005],
+      ['I','%I0.3','Eixo Z recuado', pose.y > ZUP-0.005],
+      ['I','%I0.4','Vacuostato manipulador', f.vac],
+      ['I','%I0.5','Vacuostato base de gravação', false],
+      ['sec','Saídas CLP'],
+      ['Q','%Q0.0','Avança eixo Z', f.zdown],
+      ['Q','%Q0.1','Aciona vácuo manipulador', f.vac],
+      ['Q','%Q0.2','Aciona vácuo base de gravação', false],
+      ['Q','%Q0.3','Motor esteira 1 e giro', S.belt],
+      ['Q','%Q0.4','Motor esteira 2', S.belt],
+      ['sec','Drives'],
+      ['A','LEFS16RB','Eixo X', ((pose.x+0.2)*1000).toFixed(0)+' mm'],
+      ['A','LEYG16MB','Eixo Y', ((pose.z-tz0)*1000).toFixed(0)+' mm'],
+    ]; }
+  };
+  stations.push(st);
+}
+
+/* ---------- 3 · MONTAGEM : UR3e + SCHUNK EGH 80-IOL + câmera MVISIA + base de translado ---------- */
+{
+  const b = BENCH[2], g = benches[2];
+  const BX = -0.06, BZ = -0.10, BASE_Y = TABLE_Y + 0.015;
+  const FEED_X = 0.30, FEED_Z = 0.08;
+  const ASM_Z = -0.31, ASM_X = [-0.04, -0.13, -0.22];               // andar inferior: direita · meio: centro · superior: esquerda
+  const ASM_Y = TABLE_Y + 0.012;
+  const TW = { x:-0.36, z:-0.37 };
+  const GD = 0.016;                                                 // profundidade de pega dos dedos
+  // magazine de tampa e base de montagem (chapa com 3 cases)
+  box(0.42,0.012,0.13,M.black,-0.17,TABLE_Y+0.006,-0.34,g);
+  ASM_X.forEach(x=>{ box(0.068,0.002,0.068,M.slot,x,ASM_Y+0.001,ASM_Z,g); for (const sx of [-1,1]) box(0.004,0.008,0.07,M.yellow,x+sx*0.036,ASM_Y+0.004,ASM_Z,g); });
+  const tube = box(0.068,0.13,0.068,M.glass,TW.x,ASM_Y+0.065,TW.z,g); tube.castShadow=false;
+  for (const sx of [-1,1]) for (const sz of [-1,1]) box(0.004,0.13,0.004,M.alu,TW.x+sx*0.034,ASM_Y+0.065,TW.z+sz*0.034,g);
+  const tampas = [];
+  const refillTampas = () => { while(tampas.length<8){ const t=makeTampa(); t.position.set(TW.x, ASM_Y+TAMPA_H/2+tampas.length*TAMPA_H, TW.z); g.add(t); tampas.push(t); } };
+  refillTampas();
+  // rampa alimentadora (item 3) e bandeja de descarte
+  { const r = new THREE.Group(); r.position.set(-0.39, TABLE_Y, 0.1); g.add(r); for (const sx of [-1,1]) { const rail=box(0.012,0.012,0.22,M.alu,sx*0.035,0.08,0,r); rail.rotation.x=0.45; } box(0.08,0.006,0.2,M.alu,0,0.075,0,r).rotation.x=0.45; box(0.012,0.12,0.012,M.alu,-0.035,0.06,-0.07,r); box(0.012,0.12,0.012,M.alu,0.035,0.06,-0.07,r); }
+  const BIN = { x:-0.27, z:0.08 };
+  box(0.08,0.004,0.07,M.black,BIN.x,TABLE_Y+0.002,BIN.z,g);
+  for (const [dx,dz,w,d] of [[0,-0.035,0.08,0.004],[0,0.035,0.08,0.004],[-0.04,0,0.004,0.07],[0.04,0,0.004,0.07]]) box(w,0.03,d,M.black,BIN.x+dx,TABLE_Y+0.015,BIN.z+dz,g);
+  // base de translado (item 8): chapa de deslizamento + cilindro sem haste com ventosa
+  box(0.08,0.004,0.17,M.black,FEED_X,BELT_Y-0.002,0.115,g);
+  for (const sx of [-1,1]) box(0.004,0.012,0.17,M.black,FEED_X+sx*0.042,BELT_Y+0.004,0.115,g);
+  const tr = my1b(0.25); tr.g.position.set(FEED_X+0.07, TABLE_Y, 0.06); g.add(tr.g);
+  const trB = new THREE.Group(); tr.car.add(trB);
+  box(0.012,BELT_Y-TABLE_Y-0.02,0.03,M.aluDark,0,(BELT_Y-TABLE_Y)/2+0.02,0,trB);
+  box(0.07,0.012,0.03,M.aluDark,-0.035,BELT_Y-TABLE_Y+0.012,0,trB);
+  vacuumCup(trB, -0.07, BELT_Y-TABLE_Y+BH/2-0.004, 0.015, 'z');
+  const cupZ = f => FEED_Z - BW/2 + f*(ZB - FEED_Z);
+  // UR3e sobre chapa de fixação + garra SCHUNK EGH 80
+  box(0.16,0.015,0.16,M.aluDark,BX,TABLE_Y+0.0075,BZ,g);
+  const ur = ur3e(); ur.base.position.set(BX, BASE_Y, BZ); g.add(ur.base);
+  const egh = egh80(); ur.tool.add(egh.g);
+  const tip = new THREE.Object3D(); tip.position.y = -egh.TCP; ur.tool.add(tip);
+  // sistema de visão MVISIA (item 7)
+  const CAM = { x:0.33, z:-0.36, y:TABLE_Y+0.3 };
+  profile(0.33, 0.03, 0.03, 'y', CAM.x+0.03, TABLE_Y+0.165, CAM.z, g);
+  box(0.05,0.008,0.03,M.aluDark,CAM.x+0.01,CAM.y+0.03,CAM.z,g);
+  const cam = camera3d(g, CAM.x, CAM.y, CAM.z, -Math.PI/2);
+  const camLight = new THREE.PointLight(0xffffff, 0, 0.5); camLight.position.set(CAM.x-0.08, CAM.y, CAM.z); g.add(camLight);
+  const fov = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.12,4,1,true), new THREE.MeshBasicMaterial({ color:0x62d26f, transparent:true, opacity:.14, side:THREE.DoubleSide, depthWrite:false }));
+  fov.rotation.z = -Math.PI/2; fov.position.set(CAM.x-0.12, CAM.y, CAM.z); fov.visible=false; g.add(fov);
+  const SHOW = { x:CAM.x-0.18, y:CAM.y, z:CAM.z };
+  const stopX = b.cx + FEED_X, stp = stopper(stopX), led = antenna(stopX);
+  const STOP_S = sAt(stopX);
+  // pose do robô em coordenadas cilíndricas ao redor da base (evita passar pelo eixo J1)
+  const polar = (x,z) => ({ a:Math.atan2(z-BZ, x-BX), rr:Math.hypot(x-BX, z-BZ) });
+  const OPEN = 0.045;
+  const HOMEP = { x:0.13, y:TABLE_Y+0.32, z:0.02 };
+  const pose = { ...polar(HOMEP.x, HOMEP.z), y:HOMEP.y, w:0, gw:OPEN };
+  const unwrap = (a, ref) => ref + Math.atan2(Math.sin(a-ref), Math.cos(a-ref));
+  const mvR = (target, t=0.9) => ({ get to(){ const T = typeof target==='function' ? target() : target; const out = { ...T }; delete out.x; delete out.z; if (T.x!==undefined){ const p = polar(T.x, T.z); out.a = unwrap(p.a, pose.a); out.rr = p.rr; } return out; }, t });
+  let held = null;
+  const J = ur.q;
+  const run = new Runner(pose, p=>{
+    const x = BX + p.rr*Math.cos(p.a), z = BZ + p.rr*Math.sin(p.a);
+    ur.ik(x - BX, p.y + egh.TCP - BASE_Y, z - BZ, p.w);
+    egh.set(p.gw);
+    if (held) follow(held.obj, tip, held.dy, p.w);
+  });
+  const fpose = { f:0 };
+  let onPlate = null;
+  const frun = new Runner(fpose, p=>{ const cz=cupZ(p.f); tr.set(cz - 0.06 - 0.026); if (onPlate) onPlate.g.position.z = g.position.z + cz + BW/2; });
+  const f = { stop:false, vac:false, fwd:false, back:false, rfid:'', cam:'', camOk:true };
+  const A = { order:null, next:0, placed:[], lamDone:0, feedBlk:null, finishing:false, stackOnPlate:null, pushing:false };
+  const hold = (obj, dy) => { scene.attach(obj); held = { obj, dy }; };
+  const st = {
+    name:'Montagem', run, f, stopS:STOP_S, A,
+    desc:'Empilha os andares do Smart Block e encaixa as lâminas. A base de translado puxa cada base da esteira, e o robô colaborativo UR3e, com garra SCHUNK EGH 80, a coloca na posição: andar inferior à direita, do meio no centro, superior à esquerda. O robô pega as lâminas no depósito do processo, mostra cada uma à câmera MVISIA, encaixa nas ranhuras, põe a tampa no andar superior, empilha os andares e devolve o pedido à esteira.',
+    kit:'CLP S7-1500 · IHM KTP700 · Universal Robots UR3e (alcance 500 mm, carga 3 kg) · garra SCHUNK EGH 80-IOL-N (IO-Link, 40 mm por mordente) · câmera MVISIA · magazine de tampa e base de montagem · rampa alimentadora · base de translado com ventosa ZPT25 · válvulas VQC',
+    msg:'Aguardando base', prog:0,
+    busy(){ return run.busy || frun.busy; },
+    detail(){ return A.order ? `OP${A.order.id} · ${A.placed.filter(Boolean).length}/${A.order.floors.length} andar(es) na base` : `${belt.filter(x=>x.target==='M').length} base(s) a caminho`; },
+    accepts(blk){ return !A.pushing && !A.finishing && !A.stackOnPlate && (A.order===null ? blk.floor===0 : blk.order===A.order); },
+    update(){
+      stp.set(f.stop); led.emissiveIntensity = f.rfid ? 2 + Math.sin(S.simT*20) : 0;
+      fov.visible = !!f.cam; fov.material.color.set(f.camOk ? 0x62d26f : 0xe5484d); camLight.intensity = f.cam ? 1.5 : 0; M.led.emissiveIntensity = f.cam ? 2.5 : 0.4;
+      if (!frun.busy){
+        if (A.stackOnPlate && !run.busy && spaceFree(STOP_S, GAP)) this.pushOut();
+        else if (!A.feedBlk && !A.stackOnPlate){
+          const blk = belt.find(x=>x.state==='arrived' && x.target==='M');
+          if (blk && (A.order===null || blk.order===A.order) && blk.floor===A.next) this.pullIn(blk);
+        }
+      }
+      if (run.busy) return;
+      if (A.feedBlk && fpose.f<0.01) { this.placeFloor(A.feedBlk); return; }
+      if (A.order && !A.finishing && A.lamDone===A.order.floors.length) { this.finish(); return; }
+      if (!A.order) this.msg = 'Aguardando base';
+    },
+    pullIn(blk){
+      const o = blk.order; if (!A.order){ A.order=o; o.status='Montagem'; renderOrders(); }
+      A.next++;
+      frun.add(
+        act(()=>{ f.stop=true; f.rfid='Lendo'; this.msg=`RFID: OP${o.id} · andar ${blk.floor+1}`; }), wait(0.9),
+        act(()=>{ f.rfid=''; f.fwd=true; }), mv({ f:1 }, 0.7),
+        act(()=>{ f.fwd=false; f.vac=true; takeOffBelt(blk); onPlate=blk; }), wait(0.25),
+        act(()=>{ f.back=true; }), mv({ f:0 }, 0.8),
+        act(()=>{ f.back=false; f.vac=false; f.stop=false; onPlate=null; place(g, blk.g, FEED_X, BELT_Y, FEED_Z, 0); A.feedBlk=blk; }),
+        mv({ f:0 }, 0.01),
+      );
+    },
+    placeFloor(blk){
+      const k = blk.floor, o = blk.order, x = ASM_X[k];
+      A.feedBlk = null;
+      const ctx = { o, k, blk, fl:o.floors[k], key:`${o.id}-${k}`, ok:0 };
+      const gy = BH - GD;
+      run.add(
+        act(()=>{ this.msg=`Andar ${k+1}: manipulação do bloco`; this.prog=0.05; }),
+        mvR({ x:FEED_X, y:BELT_Y+BH+0.06, z:FEED_Z, w:0, gw:OPEN }, 1.0), mv({ y:BELT_Y+gy }, 0.35), mv({ gw:BW/2 }, 0.25),
+        act(()=>hold(blk.g, gy)),
+        mv({ y:BELT_Y+BH+0.08 }, 0.35), mvR({ x, z:ASM_Z, y:ASM_Y+BH+0.06 }, 1.3), mv({ y:ASM_Y+gy }, 0.35),
+        act(()=>{ held=null; place(g, blk.g, x, ASM_Y, ASM_Z, 0); A.placed[k]=blk; blk.rfid=`OP${o.id} · andar ${k+1} na base de montagem`; }),
+        mv({ gw:OPEN }, 0.2), mv({ y:ASM_Y+BH+0.08 }, 0.3),
+      );
+      [0,1,2].forEach(j=>run.add(this.lamSteps(ctx, j)));
+    },
+    lamSteps(ctx, j){
+      let it;
+      const top = TABLE_Y + 0.014 + LAM_H, gy = top - 0.008;
+      return [
+        act(()=>{ this.msg=`Andar ${ctx.k+1} · lâmina ${WALL[j].name}: aguardando o processo`; }),
+        until(()=>deposit.key===ctx.key && !!deposit.items[j]),
+        act(()=>{ it=deposit.items[j]; ctx.dp = g.worldToLocal(it.mesh.getWorldPosition(new THREE.Vector3())); this.msg=`Andar ${ctx.k+1} · lâmina ${WALL[j].name}: retirando do depósito`; }),
+        mvR(()=>({ x:ctx.dp.x, y:top+0.07, z:ctx.dp.z, w:0, gw:OPEN*0.5 }), 1.2), mv({ y:gy }, 0.35), mv({ gw:LAM_T/2 }, 0.2),
+        act(()=>{ deposit.items[j]=null; hold(it.mesh, LAM_H/2-0.008); }),
+        mv({ y:top+0.09 }, 0.35),
+        act(()=>{ this.msg=`Andar ${ctx.k+1} · lâmina ${WALL[j].name}: conferência na câmera MVISIA`; }),
+        mvR({ x:SHOW.x, y:SHOW.y, z:SHOW.z, w:0 }, 1.1),
+        act(()=>{ f.cam=it.color; f.camOk = it.color===ctx.fl.lam[j].c; }), wait(0.8),
+        act(()=>{
+          const ok = f.camOk; f.cam='';
+          if (ok){ log(`Visão: OP${ctx.o.id} andar ${ctx.k+1} · ${WALL[j].name} ${it.color}/${it.model} OK`); run.front(this.insertSteps(ctx, j, it)); }
+          else {
+            log(`<b style="color:var(--warn)">Visão: lâmina ${it.color} no lugar de ${ctx.fl.lam[j].c} · descartada</b>`);
+            deposit.redo.push(j);
+            run.front([
+              act(()=>{ this.msg='Cor errada: lâmina descartada para o operador'; }),
+              mvR({ x:BIN.x, y:TABLE_Y+0.12, z:BIN.z }, 1.0), mv({ y:TABLE_Y+0.05 }, 0.3),
+              act(()=>{ held=null; place(g, it.mesh, BIN.x+(Math.random()-.5)*0.03, TABLE_Y+0.004+LAM_T, BIN.z+(Math.random()-.5)*0.02, Math.random()*3); it.mesh.rotation.z=Math.PI/2; }),
+              mv({ gw:OPEN*0.5 }, 0.2), mv({ y:TABLE_Y+0.14 }, 0.3),
+              ...this.lamSteps(ctx, j),
+            ]);
+          }
+        }),
+      ];
+    },
+    insertSteps(ctx, j, it){
+      const w = WALL[j], x = ASM_X[ctx.k] + w.x, z = ASM_Z + w.z, cy = ASM_Y + 0.004 + LAM_H/2 + 0.003, gy = cy + LAM_H/2 - 0.008;
+      return [
+        act(()=>{ this.msg=`Andar ${ctx.k+1} · encaixe da lâmina ${w.name}`; }),
+        mvR({ x, z, y:ASM_Y+BH+0.06, w:w.ry }, 1.0), mv({ y:gy }, 0.45),
+        act(()=>{ held=null; place(ctx.blk.g, it.mesh, w.x, cy-ASM_Y, w.z, w.ry); ctx.blk.lam[j]={ c:it.color, m:it.model }; }),
+        mv({ gw:OPEN*0.5 }, 0.2), mv({ y:ASM_Y+BH+0.08, w:0 }, 0.35),
+        act(()=>{ ctx.ok++; this.prog = 0.1 + 0.6*((A.lamDone*3+ctx.ok)/(A.order.floors.length*3)); if (ctx.ok===3){ deposit.key=null; A.lamDone++; ctx.blk.rfid=`OP${ctx.o.id} · andar ${ctx.k+1} com lâminas`; } }),
+      ];
+    },
+    finish(){
+      A.finishing = true;
+      const o = A.order, N = o.floors.length, top = A.placed[N-1], x0 = ASM_X[0], gy = BH - GD;
+      let tp;
+      run.add(
+        act(()=>{ this.msg='Tampa no andar superior'; if (tampas.length<2){ refillTampas(); } }),
+        mvR({ x:TW.x, z:TW.z, y:ASM_Y+0.22, w:0, gw:OPEN }, 1.1),
+        mvR(()=>({ y:ASM_Y+(tampas.length-0.5)*TAMPA_H }), 0.45), mv({ gw:(BW+0.002)/2 }, 0.2),
+        act(()=>{ tp = tampas.pop(); hold(tp, 0); }),
+        mv({ y:ASM_Y+0.22 }, 0.5), mvR({ x:ASM_X[N-1], z:ASM_Z, y:ASM_Y+BH+TAMPA_H+0.05 }, 1.0), mv({ y:ASM_Y+BH+TAMPA_H/2 }, 0.35),
+        act(()=>{ held=null; place(top.g, tp, 0, BH+TAMPA_H/2, 0, 0); top.tampa=true; }),
+        mv({ gw:OPEN }, 0.2), mv({ y:ASM_Y+BH+0.08 }, 0.3),
+      );
+      for (let k=1;k<N;k++){
+        const blk = A.placed[k];
+        run.add(
+          act(()=>{ this.msg=`Empilhando o andar ${k+1} sobre o andar ${k}`; }),
+          mvR({ x:ASM_X[k], z:ASM_Z, y:ASM_Y+BH+0.05 }, 0.8), mv({ y:ASM_Y+gy }, 0.3), mv({ gw:BW/2 }, 0.2),
+          act(()=>hold(blk.g, gy)),
+          mv({ y:ASM_Y+k*BH+BH+0.05 }, 0.45), mvR({ x:x0, z:ASM_Z }, 0.8), mv({ y:ASM_Y+k*BH+gy }, 0.4),
+          act(()=>{ held=null; place(A.placed[0].g, blk.g, 0, k*BH, 0, 0); }),
+          mv({ gw:OPEN }, 0.2), mv({ y:ASM_Y+(k+1)*BH+0.06 }, 0.3),
+        );
+      }
+      const H = N*BH, bot = A.placed[0], sy = H - GD;
+      run.add(
+        act(()=>{ this.msg='Pedido montado: levando à base de translado'; this.prog=.9; }),
+        mvR({ x:x0, z:ASM_Z, y:ASM_Y+H+0.05 }, 0.6), mv({ y:ASM_Y+sy }, 0.3), mv({ gw:BW/2 }, 0.2),
+        act(()=>hold(bot.g, sy)),
+        mv({ y:BELT_Y+H+0.1 }, 0.5), mvR({ x:FEED_X, z:FEED_Z }, 1.3), mv({ y:BELT_Y+sy }, 0.4),
+        act(()=>{ held=null; place(g, bot.g, FEED_X, BELT_Y, FEED_Z, 0); A.stackOnPlate = bot; bot.rfid=`OP${o.id} · ${N} andar(es) montado(s)`; }),
+        mv({ gw:OPEN }, 0.2), mv({ y:BELT_Y+H+0.12 }, 0.3), mvR({ ...HOMEP }, 0.9),
+      );
+    },
+    pushOut(){
+      const blk = A.stackOnPlate, o = A.order; A.pushing = true;
+      frun.add(
+        act(()=>{ f.stop=true; f.fwd=true; scene.attach(blk.g); onPlate=blk; this.msg='Base de translado devolve o pedido à esteira'; }),
+        mv({ f:1 }, 0.8),
+        act(()=>{ f.fwd=false; onPlate=null; putOnBelt(blk, STOP_S, 'X'); f.rfid='Escrevendo'; }),
+        act(()=>{ f.back=true; }), mv({ f:0 }, 0.7), act(()=>{ f.back=false; }), wait(0.6),
+        act(()=>{
+          f.rfid=''; f.stop=false; blk.state='move'; o.status='Esteira'; renderOrders();
+          blk.rfid=`OP${o.id} · montagem concluída`;
+          log(`Montagem: OP${o.id} montada e devolvida à esteira`);
+          Object.assign(A, { order:null, next:0, placed:[], lamDone:0, feedBlk:null, finishing:false, stackOnPlate:null, pushing:false });
+          this.prog=0; this.msg='Aguardando base';
+        }),
+      );
+    },
+    io(){ const d=r=>(r*180/Math.PI).toFixed(0)+'°'; return [
+      ['sec','CLP S7-1500'],
+      ['I','%I0.1','Emergência (DI1)', !S.estop],
+      ['Q','%Q0.0','Status do processo ao Smart Sense', this.busy()],
+      ['sec','IO-Link'],
+      ['A','C/Q1','Antena RFID', f.rfid||'Livre'],
+      ['I','C/Q2','Remota: translado avançado', fpose.f>0.97],
+      ['I','C/Q2','Remota: translado recuado', fpose.f<0.03],
+      ['I','C/Q3','Vacuostato', f.vac],
+      ['Q','C/Q4','Válvulas: avança translado', f.fwd],
+      ['Q','C/Q4','Válvulas: recua translado', f.back],
+      ['Q','C/Q4','Válvulas: vácuo', f.vac],
+      ['Q','C/Q4','Válvulas: stopper', f.stop],
+      ['A','EGH 80','Abertura dos dedos', (pose.gw*2000).toFixed(0)+' mm'],
+      ['A','MVISIA','Cor detectada', f.cam ? `${f.cam} ${f.camOk?'✓':'✗'}` : '—'],
+      ['sec','UR3e · juntas (modelo)'],
+      ['A','J1','Base', d(J[0])], ['A','J2','Ombro', d(J[1])], ['A','J3','Cotovelo', d(J[2])], ['A','J4','Punho 1', d(J[3])], ['A','J5','Punho 2', d(J[4])], ['A','J6','Punho 3', d(J[5])],
+    ]; }
+  };
+  st.frun = frun;
+  stations.push(st);
+}
+
+/* ---------- 4 · EXPEDIÇÃO : LEFS16RB-400 (X) + LERH50K (giro) + LEFS16B-300 (Y) + alimentador com ventosa ---------- */
+{
+  const b = BENCH[3], g = benches[3];
+  const COL_Z = -0.05, STOP_LX = 0.14;
+  const SH_X = [0,1,2,3,4,5].map(i=>-0.25+i*0.064), SH_Z = -0.305;
+  const SH_Y = [0,1,2].map(l=>TABLE_Y + 0.38 - l*0.14);              // posição 0 = canto superior esquerdo
+  // prateleira de produtos finalizados (perfis 30x30 + chapas com divisórias, placas de identificação de andar)
+  for (const x of [-0.31, 0.12]) for (const z of [SH_Z-0.045, SH_Z+0.045]) profile(0.45, 0.03, 0.03, 'y', x, TABLE_Y+0.225, z, g);
+  const idM = [std(0xd8f0ff,{transparent:true,opacity:.7}), std(0x9ee8f0,{transparent:true,opacity:.7}), std(0xd8f0ff,{transparent:true,opacity:.7})];
+  SH_Y.forEach((y,l)=>{ box(0.45, 0.006, 0.1, M.black, -0.095, y-0.003, SH_Z, g); for (let i=0;i<=6;i++) box(0.004,0.016,0.085,M.black,SH_X[0]-0.032+i*0.064,y+0.008,SH_Z-0.006,g).castShadow=false; box(0.45,0.024,0.004,M.black,-0.095,y+0.012,SH_Z-0.05,g); box(0.06,0.03,0.003,idM[l],0.17,y+0.01,SH_Z+0.06,g); });
+  // eixo X: SMC LEFS16RB-400 sobre a mesa
+  const ax = lefs(0.40, 1); ax.g.position.set(-0.06, TABLE_Y, COL_Z); g.add(ax.g);
+  for (let i=0;i<12;i++) box(0.03,0.02,0.03,M.chain,-0.25+i*0.032,TABLE_Y+0.01,COL_Z+0.05,g).castShadow=false;
+  // carro X → mesa giratória LERH50K → coluna LEFS16B-300
+  const xc = new THREE.Group(); g.add(xc);
+  box(0.09,0.008,0.09,M.aluDark,0,TABLE_Y+0.052,COL_Z,xc);
+  const rt = lerh(); rt.g.position.set(0, TABLE_Y+0.056, COL_Z); rt.g.rotation.y = Math.PI; xc.add(rt.g);
+  const rot = new THREE.Group(); rot.position.set(0, TABLE_Y+0.108, COL_Z); xc.add(rot);
+  box(0.07,0.008,0.07,M.aluDark,0,0.004,0,rot);
+  const vz = lefs(0.30, 1); vz.g.rotation.set(0, Math.PI/2, Math.PI/2); vz.g.position.set(0, 0.008 + 0.21 + 0.004, -0.045); rot.add(vz.g);
+  for (let i=0;i<10;i++) box(0.03,0.03,0.022,M.chain,0.04,0.05+i*0.033,-0.05,rot).castShadow=false;
+  // plataforma com alimentador (cilindro guiado + ventosa ZPT25)
+  const yc = new THREE.Group(); rot.add(yc);
+  box(0.06,0.05,0.012,M.aluDark,0,0.0,0.004,yc);
+  box(0.07,0.006,0.12,M.aluDark,0,-0.003,0.07,yc);                     // plataforma
+  for (const sx of [-1,1]) box(0.004,0.014,0.12,M.black,sx*0.037,0.007,0.07,yc);
+  box(0.034,0.026,0.03,M.smcBody,0,0.03,0.02,yc);                      // cilindro do alimentador
+  const pad = new THREE.Group(); yc.add(pad);
+  box(0.03,0.03,0.006,M.aluDark,0,0.03,-0.006,pad);
+  vacuumCup(pad, 0, 0.022, 0.004, 'z');
+  const prods = [-0.009,0.009].map(dx=>{ const c=cyl(0.003,0.003,1,M.rod,dx,0.03,0,yc,8); c.rotation.x=Math.PI/2; return c; });
+  const carry = new THREE.Object3D(); yc.add(carry);
+  const stopX = b.cx + STOP_LX, stp = stopper(stopX), led = antenna(stopX);
+  const STOP_S = sAt(stopX);
+  // ventosa: f=0 recuada (bloco sobre a plataforma) · f=1 bloco na esteira / dentro da prateleira
+  const R_BELT = ZB - COL_Z, R_HOME = 0.1;
+  const padZ = f => (R_HOME + f*(R_BELT - R_HOME)) - BW/2 - 0.016;
+  const pose = { x:STOP_LX, y:BELT_Y+0.15, rot:0, f:0 };
+  let held = null;
+  const run = new Runner(pose, p=>{
+    xc.position.x = p.x; ax.set(p.x + 0.06 + 0.2);
+    rot.rotation.y = p.rot; rt.table.rotation.y = -p.rot;
+    yc.position.y = p.y - (TABLE_Y + 0.108);
+    vz.set(yc.position.y - vz.g.position.y + 0.15 + 0.03);
+    const z = padZ(p.f); pad.position.z = z; prods.forEach(c=>{ c.scale.y=Math.max(0.005, z-0.035); c.position.z=(z+0.035)/2; });
+    carry.position.set(0, 0, z + 0.016 + BW/2);
+    if (held) follow(held.g, carry, 0, p.rot);
+  });
+  const f = { stop:false, vac:false, fwd:false, back:false, rfid:'' };
+  const shelf = new Array(18).fill(null), leaving = [];
+  const st = {
+    name:'Expedição', run, f, stopS:STOP_S,
+    desc:'Armazena os pedidos finalizados. Quando o pedido montado chega ao RFID, o manipulador vai até a esteira e o alimentador com ventosa ZPT25 o puxa para a plataforma. O manipulador tem eixo X SMC LEFS16RB-400, mesa giratória LERH50K e eixo Y SMC LEFS16B-300. Depois o manipulador gira, sobe até o nível livre e o alimentador empurra o pedido para a prateleira, preenchida da esquerda para a direita e de cima para baixo.',
+    kit:'CLP S7-1200 · IHM KTP700 · SMC LEFS16RB-400 (X) · SMC LERH50K (giro) · SMC LEFS16B-300 (Y) · alimentador com ventosa ZPT25 · stoppers CJ1 · esteira de giro · prateleira 3 × 6 · RFID IO-Link',
+    msg:'Aguardando pedido', prog:0,
+    busy(){ return run.busy; },
+    detail(){ return `Prateleira: ${shelf.filter(Boolean).length}/18`; },
+    update(dt){
+      stp.set(f.stop); led.emissiveIntensity = f.rfid ? 2 + Math.sin(S.simT*20) : 0;
+      for (let i=leaving.length-1;i>=0;i--){ const o=leaving[i]; o.t+=dt; o.m.position.y += dt*0.12; o.m.scale.setScalar(Math.max(0.001,1-o.t)); if(o.t>1){ o.m.parent.remove(o.m); leaving.splice(i,1); } }
+      if (run.busy) return;
+      const blk = belt.find(x=>x.state==='arrived' && x.target==='X');
+      if (!blk){ this.msg='Aguardando pedido'; return; }
+      this.store(blk);
+    },
+    store(blk){
+      const o = blk.order, N = o.floors.length;
+      const i = shelf.findIndex(s=>!s), x=SH_X[i%6], y=SH_Y[Math.floor(i/6)];
+      shelf[i] = blk;
+      run.add(
+        act(()=>{ f.stop=true; f.rfid='Lendo'; o.status='Expedição'; renderOrders(); this.msg=`RFID: OP${o.id} com montagem concluída`; this.prog=0; }),
+        mv({ x:STOP_LX, rot:0, y:BELT_Y }, 0.9), wait(0.3),
+        act(()=>{ f.rfid=''; f.fwd=true; }), mv({ f:1 }, 0.7),
+        act(()=>{ f.fwd=false; f.vac=true; takeOffBelt(blk); held=blk; scene.attach(blk.g); }), wait(0.25),
+        act(()=>{ f.back=true; }), mv({ f:0 }, 0.8),
+        act(()=>{ f.back=false; f.vac=false; f.stop=false; this.msg=`Levando à posição ${i} da prateleira`; this.prog=.4; }),
+        mv({ y:y+0.004 }, 0.6), mv({ rot:Math.PI }, 0.9), mv({ x }, 1.0),
+        act(()=>{ f.fwd=true; }), mv({ f:1 }, 0.8),
+        act(()=>{ f.fwd=false; held=null; place(g, blk.g, x, y, SH_Z, Math.PI); }),
+        act(()=>{ f.back=true; }), mv({ f:0 }, 0.6), act(()=>{ f.back=false; }),
+        act(()=>{
+          o.status='Concluída'; S.done++; S.leads.push(S.simT-o.t0); if (S.leads.length>10) S.leads.shift();
+          blk.rfid=`OP${o.id} · expedida · posição ${i}`; renderOrders(); this.prog=1;
+          log(`Expedição: OP${o.id} armazenada na posição ${i} (${(S.simT-o.t0).toFixed(0)} s)`);
+          if (shelf.every(Boolean)){ shelf.forEach((s,j)=>{ leaving.push({ m:s.g, t:0 }); shelf[j]=null; }); log('Expedição: prateleira cheia, lote despachado'); }
+        }),
+        mv({ rot:0 }, 0.8), mv({ x:STOP_LX, y:BELT_Y+0.15 }, 0.9), act(()=>{ this.prog=0; }),
+      );
+    },
+    io(){ return [
+      ['sec','Entradas CLP'],
+      ['I','%I0.1','Emergência', !S.estop],
+      ['I','%I0.2','Alimentador avançado', pose.f>0.97],
+      ['I','%I0.3','Alimentador recuado', pose.f<0.03],
+      ['I','%I0.4','Vacuostato', f.vac],
+      ['sec','Saídas CLP'],
+      ['Q','%Q0.0','Avança alimentador', f.fwd],
+      ['Q','%Q0.1','Aciona vácuo', f.vac],
+      ['Q','%Q0.2','Motor esteira 1 e giro', S.belt],
+      ['Q','%Q0.3','Motor esteira 2', S.belt],
+      ['Q','%Q0.4','Válvula 1 do stopper', f.stop],
+      ['Q','%Q0.5','Válvula 2 do stopper', f.stop],
+      ['sec','Drives e IO-Link'],
+      ['A','LEFS16RB','Eixo X', ((pose.x+0.26)*1000).toFixed(0)+' mm'],
+      ['A','LEFS16B','Eixo Y', ((pose.y-BELT_Y)*1000).toFixed(0)+' mm'],
+      ['A','LERH50K','Giro', (pose.rot*180/Math.PI).toFixed(0)+'°'],
+      ['A','C/Q1','Antena RFID', f.rfid||'Livre'],
+    ]; }
+  };
+  stations.push(st);
+}
+
+/* ---------- 5 · INTEGRAÇÃO ---------- */
+const tower = {}; let dome;
+{
+  const g = integ, topY = 0.05 + 1.08;
+  rbox(0.34,0.012,0.24,0.004,M.black,0,topY+0.006,-0.02,g);
+  const lid = rbox(0.34,0.22,0.01,0.004,M.black,0,topY+0.12,-0.14,g); lid.rotation.x=-0.25;
+  const scr = box(0.31,0.19,0.002,std(0x0f2a18,{emissive:0x0e3a1a}),0,topY+0.12,-0.133,g); scr.rotation.x=-0.25;
+  const yawG = new THREE.Group(); yawG.position.set(-0.22, topY+0.02, -0.2); g.add(yawG);
+  cyl(0.03,0.035,0.03,M.white,0,0,0,yawG);
+  dome = new THREE.Group(); dome.position.y=0.05; yawG.add(dome);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.045,24,16), M.white); head.castShadow=true; dome.add(head);
+  cyl(0.018,0.018,0.02,M.black,0,0,0.04,dome).rotation.x=Math.PI/2;
+  dome.userData.yaw = yawG;
+  cyl(0.012,0.012,0.12,M.aluDark,0.24,topY+0.06,-0.2,g);
+  [['red',0xff3b3b],['amber',0xffb020],['green',0x2ee06e]].forEach(([k,c],i)=>{ const m=new THREE.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:0, transparent:true, opacity:.9, roughness:.3 }); cyl(0.022,0.022,0.04,m,0.24,topY+0.26-i*0.042,-0.2,g); tower[k]=m; });
+  const fp = new THREE.Group(); fp.position.set(0.18, topY-0.12, 0.31); g.add(fp);
+  const eb = cyl(0.03,0.03,0.014,M.estopBase,0,0,0,fp); eb.rotation.x=Math.PI/2;
+  const e = cyl(0.024,0.026,0.026,M.estop,0,0,0.018,fp); e.rotation.x=Math.PI/2;
+  e.userData.estop=eb.userData.estop=true;
+  stations.push({
+    name:'Integração', virtual:true, msg:'',
+    busy(){ return false; },
+    desc:'Camada de TI/TO. Os CLPs das quatro bancadas e as IHMs se ligam por PROFINET/Ethernet a switches e ao roteador. O notebook roda a loja virtual, o MES (Elipse F4), o Node-RED, o supervisório, o gerenciador de estoque e o gêmeo digital, e envia dados por MQTT/HTTP para a nuvem (TagoIO).',
+    kit:'Notebook (loja, MES Elipse F4, Node-RED, supervisório, Tago Core, gerenciador de estoque) · switch · roteador · adaptador Wi-Fi · câmera speed dome para práticas remotas',
+    detail(){ return `${orders.filter(o=>o.status==='Planejada').length} OP(s) planejada(s) · ${orders.length} emitidas`; },
+    io(){ return [
+      ['sec','Fluxo de dados'],
+      ['I','PROFINET','CLP Estoque ↔ switch', !S.estop],
+      ['I','PROFINET','CLP Processo ↔ switch', !S.estop],
+      ['I','PROFINET','CLP Montagem ↔ switch', !S.estop],
+      ['I','PROFINET','CLP Expedição ↔ switch', !S.estop],
+      ['I','IO-Link','RFID de estoque, montagem e expedição', true],
+      ['A','OPC UA','Node-RED ↔ CLPs', S.running?'Online':'Pausado'],
+      ['A','MQTT','Telemetria para a nuvem', S.running?'Publicando':'—'],
+      ['A','HTTP','Loja virtual → MES', `${orders.length} OPs`],
+    ]; }
+  });
+}
+
+/* =============== labels + network overlay =============== */
+const labels = [];
+BENCH.forEach((b,i)=>{ const d=document.createElement('div'); d.className='lbl'; d.innerHTML=`<em>${i+1}</em>${b.name}`; const l=new CSS2DObject(d); l.position.set(b.cx, 1.66, -0.3); scene.add(l); labels.push(l); });
+{ const d=document.createElement('div'); d.className='lbl'; d.innerHTML='<em>5</em>Integração'; const l=new CSS2DObject(d); l.position.set(INTEG_X, 1.62, -0.1); scene.add(l); labels.push(l); }
+const net = new THREE.Group(); net.visible=false; scene.add(net);
+const packets = [], netLabels = [];
+{
+  const mat = new THREE.MeshBasicMaterial({ color:0x62d26f, transparent:true, opacity:.75 });
+  const pk = new THREE.MeshBasicMaterial({ color:0xd8ffd9 });
+  BENCH.forEach((b,i)=>{
+    const pts = [new THREE.Vector3(b.cx, 0.35, -0.5), new THREE.Vector3(b.cx, 0.02, -0.62-i*0.03), new THREE.Vector3(INTEG_X-0.1, 0.02, -0.62-i*0.03), new THREE.Vector3(INTEG_X-0.05, 0.35, -0.42)];
+    const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.1);
+    net.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 80, 0.006, 6, false), mat));
+    for (let k=0;k<3;k++){ const s=new THREE.Mesh(new THREE.SphereGeometry(0.014,10,8), pk); net.add(s); packets.push({ s, curve, o:k/3+i*0.11, dir:k%2?1:-1 }); }
+  });
+  const mk = (txt, x,y,z) => { const d=document.createElement('div'); d.className='lbl net'; d.textContent=txt; const l=new CSS2DObject(d); l.position.set(x,y,z); l.visible=false; net.add(l); netLabels.push(l); };
+  mk('PROFINET · Ethernet TCP/IP', 0.2, 0.08, -0.72);
+  mk('Node-RED · OPC UA · MES', INTEG_X, 1.5, -0.1);
+  mk('MQTT → nuvem', INTEG_X, 1.72, -0.1);
+  mk('IO-Link · RFID', BENCH[2].cx+0.3, BELT_Y+0.12, ZB);
+}
+
+/* =============== HMI screens =============== */
+function stateOf(i){
+  const st = stations[i];
+  if (S.estop) return ['EMERGÊNCIA','#e5484d','stop'];
+  if (!S.running) return ['PAUSADO','#f0b43c','wait'];
+  if (st.virtual) return ['ONLINE','#62d26f','run'];
+  if (/[Aa]guardando/.test(st.msg) && st.busy()) return ['AGUARDANDO','#f0b43c','wait'];
+  if (st.busy()) return ['OPERANDO','#62d26f','run'];
+  return ['PRONTO','#8d999e','idle'];
+}
+function drawScreens(){
+  for (const s of screens){
+    const g=s.g2, st=stations[s.idx], [lab,col]=stateOf(s.idx);
+    g.fillStyle='#0d1714'; g.fillRect(0,0,320,200);
+    g.fillStyle='#62d26f'; g.fillRect(0,0,320,38);
+    g.fillStyle='#0b2410'; g.font='600 23px "Barlow Condensed", Arial Narrow, sans-serif'; g.fillText(`${s.idx+1} · ${st.name.toUpperCase()}`,12,27);
+    g.fillStyle=col; g.beginPath(); g.arc(20,62,8,0,7); g.fill();
+    g.font='600 22px "Barlow Condensed", Arial Narrow, sans-serif'; g.fillText(lab,36,70);
+    g.fillStyle='#c9d2d5'; g.font='14px "IBM Plex Mono", monospace';
+    let line='', y=100;
+    for (const w of st.msg.split(' ')){ if ((line+w).length>30){ g.fillText(line,12,y); y+=18; line=''; if (y>136) break; } line+=w+' '; }
+    if (y<=136) g.fillText(line,12,y);
+    g.fillStyle='#8d999e'; g.font='13px "IBM Plex Mono", monospace'; g.fillText(st.detail().slice(0,34),12,158);
+    g.fillStyle='#1d2a2d'; g.fillRect(12,170,296,10);
+    g.fillStyle='#62d26f'; g.fillRect(12,170,296*(st.prog||0),10);
+    s.t.needsUpdate = true;
+  }
+}
+
+/* =============== simulation step =============== */
+const MON = stations[2], EXP = stations[3];
+function step(dt){
+  S.simT += dt;
+  beltTex.offset.x -= dt * V * 14;
+  turntables.forEach(t=>t.disc.rotation.y -= dt*V/R);
+  if (S.auto && orders.filter(o=>o.status==='Planejada').length < 1) autoOrder();
+  for (const b of belt){
+    if (b.state !== 'move') continue;
+    let stop = null, real = true, st = null;
+    if (b.target==='M'){ st=MON; real = MON.accepts(b); stop = real ? MON.stopS : MON.stopS - QUEUE; }
+    else if (b.target==='X'){ st=EXP; stop = EXP.stopS; }
+    let ahead = Infinity;
+    for (const q of belt){ if (q===b) continue; const d=((q.s-b.s)%P+P)%P; if (d>1e-6 && d<ahead) ahead=d; }
+    let ds = Math.min(V*dt, Math.max(0, ahead-GAP));
+    if (stop!=null){ const dStop=((stop-b.s)%P+P)%P; if (!real && dStop > P-QUEUE-0.01) ds = 0; else if (dStop < 0.5 && ds >= dStop){ ds = dStop; if (real) b.state='arrived'; } }
+    b.s = (b.s + ds) % P; placeOnBelt(b);
+  }
+  for (const st of stations){ if (st.virtual) continue; st.update(dt); st.run.step(dt); st.frun?.step(dt); }
+  dome.userData.yaw.rotation.y = Math.sin(S.simT*0.5)*1.2;
+  dome.rotation.x = -0.3 + Math.sin(S.simT*0.8)*0.12;
+  for (const p of packets){ const u = ((S.simT*0.18*p.dir + p.o)%1+1)%1; p.s.position.copy(p.curve.getPointAt(u)); }
+}
+
+/* =============== UI =============== */
+const $ = id => document.getElementById(id);
+const statusClass = s => s==='Planejada' ? 'st-fila' : s==='Concluída' ? 'st-ok' : 'st-ativo';
+function renderOrders(){
+  $('orders').innerHTML = orders.slice(-7).reverse().map(o=>`<li><span class="num">OP${o.id}</span><span class="floors">${o.floors.map((fl,k)=>`<span class="fl" title="Andar ${k+1}: bloco ${fl.block} · ${fl.lam.map(l=>l.c+'/'+l.m).join(', ')}"><b style="background:${hex(BLOCK_COL[fl.block])}"></b>${fl.lam.map(l=>`<i style="background:${hex(LAM_COL[l.c])}"></i>`).join('')}</span>`).join('')}</span><span class="pill ${statusClass(o.status)}">${o.status}</span></li>`).join('');
+}
+// loja: personalização
+const form = { n:1, floors:[randomFloor(), randomFloor(), randomFloor()] };
+const LAM_OPTS = Object.keys(LAM_COL).flatMap(c=>MODELS.map(m=>[`${c}|${m}`, `${cap(c)} · ${cap(m)}`]));
+function renderForm(){
+  const rows = [`<div class="frow fhead"><span></span><span>Bloco</span><span>Esquerda</span><span>Frontal</span><span>Direita</span></div>`];
+  for (let k=0;k<form.n;k++){
+    const fl = form.floors[k];
+    rows.push(`<div class="frow"><span>Andar ${k+1}</span>
+      <select id="fb${k}" aria-label="Cor do bloco do andar ${k+1}">${Object.keys(BLOCK_COL).map(c=>`<option value="${c}" ${c===fl.block?'selected':''}>${cap(c)}</option>`).join('')}</select>
+      ${[0,1,2].map(j=>`<select id="fl${k}_${j}" aria-label="Lâmina ${WALL[j].name} do andar ${k+1}">${LAM_OPTS.map(([v,t])=>`<option value="${v}" ${v===fl.lam[j].c+'|'+fl.lam[j].m?'selected':''}>${t}</option>`).join('')}</select>`).join('')}
+    </div>`);
+  }
+  $('floorRows').innerHTML = rows.join('');
+  for (let k=0;k<form.n;k++){
+    $('fb'+k).onchange = e => form.floors[k].block = e.target.value;
+    [0,1,2].forEach(j=>$(`fl${k}_${j}`).onchange = e => { const [c,m]=e.target.value.split('|'); form.floors[k].lam[j]={ c, m }; });
+  }
+  document.querySelectorAll('#segFloors button').forEach(b=>b.setAttribute('aria-pressed', String(+b.dataset.n===form.n)));
+}
+$('segFloors').onclick = e => { const b=e.target.closest('button'); if(!b) return; form.n=+b.dataset.n; renderForm(); };
+$('btnRandom').onclick = () => { form.floors=[randomFloor(),randomFloor(),randomFloor()]; renderForm(); };
+$('btnOrder').onclick = () => newOrder(form.floors.slice(0,form.n).map(fl=>({ block:fl.block, lam:fl.lam.map(l=>({...l})) })), true);
+$('chkAuto').onchange = e => { S.auto = e.target.checked; log(S.auto ? 'Pedidos automáticos ligados' : 'Pedidos automáticos desligados'); };
+$('chkQC').onchange = e => { S.qc = e.target.checked; };
+renderForm();
+
+const btnPlay=$('btnPlay'), banner=$('banner');
+btnPlay.onclick = () => { if (S.estop) return; S.running=!S.running; btnPlay.textContent=S.running?'Pausar':'Retomar'; btnPlay.setAttribute('aria-pressed',S.running); };
+$('selSpeed').onchange = e => S.speed = parseFloat(e.target.value);
+function triggerEstop(){ if (S.estop) return; S.estop=true; banner.hidden=false; log('<b style="color:var(--crit)">Botão de emergência acionado</b>'); }
+$('btnStop').onclick = triggerEstop;
+$('btnReset').onclick = () => { S.estop=false; banner.hidden=true; log('Relés de segurança rearmados'); };
+const toggle = (id, fn) => { const b=$(id); b.onclick=()=>{ const on=b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed',on); fn(on); }; };
+toggle('btnDoors', on=>doors.forEach(d=>d.target=on?1:0));
+toggle('btnLabels', on=>labels.forEach(l=>l.visible=on));
+toggle('btnNet', on=>{ net.visible=on; netLabels.forEach(l=>l.visible=on); });
+$('btnMes').onclick = () => $('mes').classList.toggle('open');
+
+let selected = -1, selBlock = null;
+const VIEWS = [
+  ...BENCH.map(b=>({ pos:new THREE.Vector3(b.cx+0.3, 1.62, 0.95), tgt:new THREE.Vector3(b.cx, 1.08, -0.15) })),
+  { pos:new THREE.Vector3(INTEG_X+0.9, 1.8, 1.5), tgt:new THREE.Vector3(INTEG_X, 1.0, -0.1) }
+];
+let tween = null;
+function flyTo(v){ tween = { p0:camera.position.clone(), t0:controls.target.clone(), p1:v.pos.clone(), t1:v.tgt.clone(), u:0 }; }
+function select(i){
+  selected = i; selBlock = null;
+  flyTo(i<0 ? HOME : VIEWS[i]);
+  document.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed', String(+b.dataset.view===i)));
+  updateInfo();
+}
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>select(+b.dataset.view));
+
+const ioHTML = rows => rows.map(r=>{
+  if (r[0]==='sec') return `<div class="sec">${r[1]}</div>`;
+  if (r[0]==='A') return `<span class="a">${r[1]}</span><span>${r[2]}</span><span class="v">${r[3]}</span>`;
+  return `<span class="led ${r[0]==='Q'?'q':''} ${r[3]?'on':''}"></span><span class="a">${r[1]}</span><span>${r[2]}</span>`;
+}).join('');
+function updateInfo(){
+  $('kDone').textContent = S.done;
+  $('kWip').textContent = orders.filter(o=>!['Planejada','Concluída'].includes(o.status)).length;
+  $('kLead').textContent = S.leads.length ? (S.leads.reduce((a,b)=>a+b,0)/S.leads.length).toFixed(0)+' s' : '–';
+  $('kClock').textContent = clock2(S.simT);
+  const chip = (lab, cls) => { $('iChip').className='chip '+cls; $('iChip').textContent=lab.charAt(0)+lab.slice(1).toLowerCase(); };
+  if (selBlock){
+    const b = selBlock, o = b.order, fl = o ? o.floors[b.floor] : null;
+    $('iEyebrow').textContent = 'Smart Block · tag RFID'; $('iName').textContent = `Base ${b.color}`;
+    chip(o ? (o.status==='Concluída'?'EXPEDIDO':'EM PRODUÇÃO') : 'EM ESTOQUE', o ? 'run' : 'idle');
+    $('iDesc').textContent = 'Dados gravados na tag pelas antenas RFID (IO-Link) do estoque, da montagem e da expedição.';
+    $('iKit').textContent = '';
+    $('iNow').innerHTML = `<b>Tag:</b> ${b.rfid}`;
+    $('iBar').style.width = '0%';
+    $('iIO').innerHTML = ioHTML([
+      ['sec','Conteúdo da tag'],
+      ['A','OP','Ordem de produção', o ? 'OP'+o.id : '—'],
+      ['A','Andar','Posição no pedido', o ? `${b.floor+1} de ${o.floors.length}` : '—'],
+      ['A','Cor','Base', b.color],
+      ...[0,1,2].map(j=>['A','Lâmina', cap(WALL[j].name), fl ? `${fl.lam[j].c}/${fl.lam[j].m}${b.lam[j]?' ✓':''}` : '—']),
+      ['A','Tampa','Andar superior', b.tampa ? 'Sim' : '—'],
+      ['A','Status','MES', o ? o.status : 'Em estoque'],
+    ]);
+    return;
+  }
+  if (selected < 0){
+    chip(S.estop?'EMERGÊNCIA':!S.running?'PAUSADO':'OPERANDO', S.estop?'stop':!S.running?'wait':'run');
+    $('iEyebrow').textContent='Visão geral'; $('iName').textContent='Linha completa';
+    $('iDesc').textContent='Projeto integrado do guia: a loja gera a OP com 1 a 3 andares. O estoque libera uma base por andar, o processo separa 3 lâminas por andar, a montagem encaixa lâminas e tampa e empilha os andares, e a expedição guarda o pedido. Clique em uma bancada ou em um bloco para ver sinais e dados RFID.';
+    $('iKit').textContent = 'Conjunto 3050 × 980 mm · 4 bancadas (600/600/900/600 mm) · 110/220 Vca · NR-10 e NR-12';
+    $('iNow').innerHTML = `<b>${belt.length}</b> bloco(s) na esteira · ${orders.filter(o=>o.status==='Planejada').length} OP(s) planejada(s)`;
+    $('iBar').style.width = '0%';
+    $('iIO').innerHTML = ioHTML([['sec','Estado das bancadas'], ...stations.slice(0,4).map((st,i)=>{ const [lab]=stateOf(i); return ['A', `${i+1}`, st.name, lab.charAt(0)+lab.slice(1).toLowerCase()]; })]);
+  } else {
+    const st = stations[selected], [lab,,cls] = stateOf(selected);
+    chip(lab, cls);
+    $('iEyebrow').textContent = `Bancada ${selected+1} de 5`; $('iName').textContent = st.name;
+    $('iDesc').textContent = st.desc; $('iKit').textContent = st.kit;
+    $('iNow').innerHTML = st.virtual ? st.detail() : `<b>Agora:</b> ${st.msg} · ${st.detail()}`;
+    $('iBar').style.width = ((st.prog||0)*100)+'%';
+    $('iIO').innerHTML = ioHTML(st.io());
+  }
+}
+
+/* =============== picking =============== */
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+let downAt = null;
+function hit(e){
+  const r = renderer.domElement.getBoundingClientRect();
+  ptr.set(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(ptr, camera);
+  return ray.intersectObjects([...clickBlocks, ...clickables], true)[0];
+}
+renderer.domElement.addEventListener('pointerdown', e=>{ downAt=[e.clientX,e.clientY]; });
+function pickObject(o){
+  if (o.userData.estop){ triggerEstop(); return; }
+  if (o.userData.blockRef){ selBlock = o.userData.blockRef; updateInfo(); return; }
+  if (o.userData.door){ const d=doors.find(d=>d.pivot===o.userData.door); if (d) d.target = d.target?0:1; }
+  if (o.userData.station != null) select(o.userData.station);
+}
+renderer.domElement.addEventListener('pointerup', e=>{
+  if (!downAt || Math.hypot(e.clientX-downAt[0], e.clientY-downAt[1]) > 5) return;
+  const h = hit(e); if (!h) return;
+  pickObject(h.object);
+});
+let lastMove = 0;
+renderer.domElement.addEventListener('pointermove', e=>{ const now=performance.now(); if (now-lastMove<90) return; lastMove=now; renderer.domElement.style.cursor = hit(e) ? 'pointer' : ''; });
+
+/* =============== loop =============== */
+addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); labelR.setSize(innerWidth,innerHeight); });
+const clock = new THREE.Clock();
+let uiT = 0, scrT = 0;
+log('Banco de ensaios energizado · 4 CLPs online');
+newOrder([ { block:'preto', lam:[{c:'azul',m:'casa'},{c:'verde',m:'barco'},{c:'branco',m:'estrela'}] }, { block:'vermelho', lam:[{c:'amarelo',m:'estrela'},{c:'preto',m:'casa'},{c:'vermelho',m:'barco'}] } ], false);
+function frame(){
+  const rdt = Math.min(clock.getDelta(), 0.05);
+  S.belt = S.running && !S.estop;
+  if (S.belt){ const n = Math.ceil(S.speed*2); for (let i=0;i<n;i++) step(rdt*S.speed/n); }
+  for (const d of doors){ d.a += (d.target - d.a) * Math.min(1, rdt*6); d.pivot.rotation.y = -1.7*d.a; }
+  const blink = Math.sin(performance.now()/180) > 0;
+  tower.red.emissiveIntensity = S.estop && blink ? 2.5 : 0;
+  tower.amber.emissiveIntensity = !S.estop && !S.running ? 2 : 0;
+  tower.green.emissiveIntensity = !S.estop && S.running ? 2 : 0;
+  const inXR = renderer.xr.isPresenting;
+  if (!inXR && tween){ tween.u = Math.min(1, tween.u + rdt/0.9); const u=ease(tween.u); camera.position.lerpVectors(tween.p0,tween.p1,u); controls.target.lerpVectors(tween.t0,tween.t1,u); if (tween.u>=1) tween=null; }
+  if (!inXR){ controls.update();
+  camera.position.x = Math.max(-ROOM.x+0.2, Math.min(ROOM.x-0.2, camera.position.x)); camera.position.z = Math.max(-ROOM.zb+0.2, Math.min(ROOM.zf-0.2, camera.position.z)); camera.position.y = Math.max(0.2, Math.min(ROOM.h-0.15, camera.position.y)); }
+  else xrUpdate(rdt);
+  uiT += rdt; scrT += rdt;
+  if (uiT > 0.2){ uiT=0; updateInfo(); }
+  if (scrT > 0.3){ scrT=0; drawScreens(); }
+  renderer.render(scene, camera);
+  if (!inXR) labelR.render(scene, camera);
+}
+document.fonts?.ready.then(()=>{ drawScreens(); doorTex.forEach(f=>f()); });
+renderOrders(); updateInfo(); drawScreens();
+
+/* =============== WebXR (Meta Quest 3): VR imersiva, realidade mista, controles, mãos, teletransporte e painel no mundo =============== */
+renderer.xr.enabled = true;
+renderer.xr.setReferenceSpaceType('local-floor');
+renderer.xr.setFoveation(1);
+const dolly = new THREE.Group(); scene.add(dolly); dolly.add(camera);
+const START = new THREE.Vector3(0.25, 0, 1.75);
+let xrMode = null;                                     // 'vr' | 'ar' | null
+const savedBg = scene.background;
+
+// botões de entrada na barra de controles
+const xrBar = document.querySelector('#controls .panel');
+const mkBtn = (txt, id) => { const b=document.createElement('button'); b.id=id; b.textContent=txt; b.hidden=true; xrBar.prepend(b); return b; };
+const btnAR = mkBtn('Realidade mista', 'btnAR');
+const btnVR = mkBtn('Entrar em VR', 'btnVR');
+btnVR.classList.add('primary');
+async function startXR(mode){
+  if (renderer.xr.isPresenting) return;
+  const type = mode==='ar' ? 'immersive-ar' : 'immersive-vr';
+  try {
+    const session = await navigator.xr.requestSession(type, { requiredFeatures:['local-floor'], optionalFeatures:['hand-tracking','bounded-floor','layers'] });
+    xrMode = mode;
+    await renderer.xr.setSession(session);
+  } catch(err){ log(`<b style="color:var(--warn)">Não foi possível iniciar a sessão XR: ${err.message}</b>`); }
+}
+btnVR.onclick = () => startXR('vr');
+btnAR.onclick = () => startXR('ar');
+if (navigator.xr){
+  navigator.xr.isSessionSupported('immersive-vr').then(ok=>{ btnVR.hidden=!ok; }).catch(()=>{});
+  navigator.xr.isSessionSupported('immersive-ar').then(ok=>{ btnAR.hidden=!ok; }).catch(()=>{});
+}
+
+// painel de operação flutuante (substitui o HUD em HTML dentro do óculos)
+const PW = 1024, PH = 760;
+const pc = document.createElement('canvas'); pc.width=PW; pc.height=PH; const pg = pc.getContext('2d');
+const ptex = tex(pc);
+const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.0*PH/PW), new THREE.MeshBasicMaterial({ map:ptex, transparent:true, toneMapped:false, side:THREE.DoubleSide }));
+panel.position.set(-1.95, 1.35, 1.05); panel.rotation.y = 0.75; panel.visible = false; scene.add(panel);
+const panelFrame = box(1.03, 1.03*PH/PW, 0.012, M.dark, 0, 0, -0.008, panel); panelFrame.visible = true;
+const BTN = [];
+function drawPanel(){
+  const g = pg; BTN.length = 0;
+  g.fillStyle='#111518'; g.fillRect(0,0,PW,PH);
+  g.fillStyle='#62d26f'; g.fillRect(0,0,PW,8);
+  g.fillStyle='#62d26f'; g.font='500 22px "IBM Plex Mono", monospace'; g.fillText('GÊMEO DIGITAL · SMART 4.0', 32, 52);
+  const [lab,col] = selected>=0 ? stateOf(selected) : [S.estop?'EMERGÊNCIA':S.running?'OPERANDO':'PAUSADO', S.estop?'#e5484d':S.running?'#62d26f':'#f0b43c'];
+  g.fillStyle='#e6ecee'; g.font='700 44px "Barlow Condensed", Arial Narrow, sans-serif';
+  const title = selBlock ? `BASE ${selBlock.color.toUpperCase()}` : selected>=0 ? stations[selected].name.toUpperCase() : 'LINHA COMPLETA';
+  g.fillText(title, 32, 102);
+  g.fillStyle=col; g.font='600 24px "IBM Plex Mono", monospace'; g.fillText(lab, 600, 100);
+  // KPIs
+  const k = [[S.done,'OPs concluídas'],[orders.filter(o=>!['Planejada','Concluída'].includes(o.status)).length,'Em produção'],[S.leads.length?(S.leads.reduce((a,b)=>a+b,0)/S.leads.length).toFixed(0)+' s':'–','Lead time'],[clock2(S.simT),'Tempo']];
+  k.forEach(([v,t],i)=>{ g.fillStyle='#e6ecee'; g.font='600 38px "Barlow Condensed", sans-serif'; g.fillText(String(v), 32+i*245, 160); g.fillStyle='#8d999e'; g.font='18px "IBM Plex Mono", monospace'; g.fillText(t.toUpperCase(), 32+i*245, 186); });
+  g.fillStyle='#2a3135'; g.fillRect(32,204,PW-64,2);
+  // agora
+  let y = 240;
+  g.font='22px "IBM Plex Sans", Arial, sans-serif'; g.fillStyle='#c9d2d5';
+  const now = selBlock ? `Tag: ${selBlock.rfid}` : selected>=0 ? `Agora: ${stations[selected].msg} · ${stations[selected].detail()}` : `${belt.length} bloco(s) na esteira · ${orders.filter(o=>o.status==='Planejada').length} OP(s) planejada(s)`;
+  g.fillText(now.slice(0,82), 32, y); y += 36;
+  // sinais de E/S (duas colunas)
+  let rows = [];
+  if (selected>=0 && !selBlock) rows = stations[selected].io().filter(r=>r[0]!=='sec');
+  else rows = orders.slice(-8).reverse().map(o=>['A',`OP${o.id}`,`${o.floors.length} andar(es)`,o.status]);
+  rows.slice(0,22).forEach((r,i)=>{
+    const cx = 32 + Math.floor(i/11)*490, cy = y + (i%11)*34;
+    if (r[0]==='A'){ g.fillStyle='#8d999e'; g.font='18px "IBM Plex Mono", monospace'; g.fillText(String(r[1]).slice(0,10), cx, cy+20); g.fillStyle='#e6ecee'; g.font='20px "IBM Plex Sans", sans-serif'; g.fillText(String(r[2]).slice(0,22), cx+120, cy+20); g.fillStyle='#62d26f'; g.font='20px "IBM Plex Mono", monospace'; g.fillText(String(r[3]).slice(0,14), cx+330, cy+20); }
+    else { g.fillStyle = r[3] ? (r[0]==='Q'?'#f0b43c':'#62d26f') : '#2a3135'; g.beginPath(); g.arc(cx+8, cy+13, 8, 0, 7); g.fill(); g.fillStyle='#8d999e'; g.font='18px "IBM Plex Mono", monospace'; g.fillText(r[1], cx+26, cy+20); g.fillStyle='#e6ecee'; g.font='20px "IBM Plex Sans", sans-serif'; g.fillText(String(r[2]).slice(0,30), cx+120, cy+20); }
+  });
+  // botões
+  const bx = [[S.running?'Pausar':'Retomar','play'],[`${String(S.speed).replace('.',',')}×`,'speed'],[S.estop?'Rearmar':'Emergência','estop'],['Novo pedido','order'],['Portas','doors'],['Visão geral','home']];
+  const bw = (PW-64-5*12)/6;
+  bx.forEach(([t,id],i)=>{ const x=32+i*(bw+12), yb=PH-92, h=64;
+    g.fillStyle = id==='estop' ? (S.estop?'#f0b43c':'#e5484d') : id==='play' ? '#62d26f' : '#262c30';
+    g.beginPath(); g.roundRect ? g.roundRect(x,yb,bw,h,10) : g.rect(x,yb,bw,h); g.fill();
+    g.fillStyle = id==='estop' || id==='play' ? '#0b1210' : '#e6ecee'; g.font='600 24px "IBM Plex Sans", sans-serif'; g.textAlign='center'; g.fillText(t, x+bw/2, yb+41); g.textAlign='left';
+    BTN.push({ id, x, y:yb, w:bw, h });
+  });
+  ptex.needsUpdate = true;
+}
+function panelClick(uv){
+  const px = uv.x*PW, py = (1-uv.y)*PH;
+  const b = BTN.find(b=>px>=b.x && px<=b.x+b.w && py>=b.y && py<=b.y+b.h); if (!b) return;
+  if (b.id==='play' && !S.estop){ S.running=!S.running; btnPlay.textContent=S.running?'Pausar':'Retomar'; }
+  if (b.id==='speed'){ const v=[0.5,1,2,4]; S.speed = v[(v.indexOf(S.speed)+1)%v.length]; $('selSpeed').value=String(S.speed); }
+  if (b.id==='estop'){ if (S.estop){ S.estop=false; banner.hidden=true; log('Relés de segurança rearmados'); } else triggerEstop(); }
+  if (b.id==='order') autoOrder();
+  if (b.id==='doors'){ const on = !doors.some(d=>d.target); doors.forEach(d=>d.target=on?1:0); }
+  if (b.id==='home'){ selected=-1; selBlock=null; }
+  drawPanel();
+}
+
+// rótulos 3D das bancadas (os rótulos HTML não aparecem no óculos)
+const xrLabels = [];
+[...BENCH.map((b,i)=>[`${i+1} · ${b.name}`, b.cx, 1.72, -0.3]), ['5 · Integração', INTEG_X, 1.62, -0.1]].forEach(([t,x,y,z])=>{
+  const c=document.createElement('canvas'); c.width=512; c.height=96; const g=c.getContext('2d');
+  g.fillStyle='rgba(14,17,19,.85)'; g.fillRect(0,0,512,96); g.fillStyle='#62d26f'; g.fillRect(0,0,8,96);
+  g.fillStyle='#e6ecee'; g.font='600 52px "Barlow Condensed", Arial Narrow, sans-serif'; g.fillText(t.toUpperCase(), 28, 66);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex(c), depthTest:true })); s.scale.set(0.4, 0.075, 1); s.position.set(x,y,z); s.visible=false; scene.add(s); xrLabels.push(s);
+});
+
+// controles e mãos
+const ctrlFactory = new XRControllerModelFactory(), handFactory = new XRHandModelFactory();
+const reticle = new THREE.Mesh(new THREE.RingGeometry(0.12, 0.16, 32), new THREE.MeshBasicMaterial({ color:0x62d26f, transparent:true, opacity:.8 }));
+reticle.rotation.x = -Math.PI/2; reticle.visible = false; scene.add(reticle);
+const rayGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-1)]);
+const ctrls = [0,1].map(i=>{
+  const c = renderer.xr.getController(i); dolly.add(c);
+  const line = new THREE.Line(rayGeo, new THREE.LineBasicMaterial({ color:0x62d26f, transparent:true, opacity:.8 })); line.scale.z = 3; c.add(line);
+  const grip = renderer.xr.getControllerGrip(i); grip.add(ctrlFactory.createControllerModel(grip)); dolly.add(grip);
+  const hand = renderer.xr.getHand(i); hand.add(handFactory.createHandModel(hand, 'spheres')); dolly.add(hand);
+  const st = { c, line, hit:null, floor:null, handedness:'' };
+  c.addEventListener('connected', e=>{ st.handedness = e.data.handedness; st.gamepad = e.data.gamepad; line.visible = !e.data.hand || true; });
+  c.addEventListener('disconnected', ()=>{ st.gamepad = null; });
+  c.addEventListener('selectend', ()=>{
+    if (st.hit){
+      if (st.hit.object===panel) panelClick(st.hit.uv);
+      else { pickObject(st.hit.object); drawPanel(); }
+    } else if (st.floor){
+      // teletransporte mantendo a posição relativa da cabeça
+      const head = new THREE.Vector3(); camera.getWorldPosition(head);
+      dolly.position.x += st.floor.x - head.x; dolly.position.z += st.floor.z - head.z;
+    }
+  });
+  return st;
+});
+const xr = { ray:new THREE.Raycaster(), m:new THREE.Matrix4(), turnLock:[false,false], panelT:0 };
+const floorPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+function xrUpdate(dt){
+  const targets = [panel, ...clickBlocks, ...clickables];
+  reticle.visible = false;
+  for (const [i,st] of ctrls.entries()){
+    st.hit = null; st.floor = null;
+    if (!st.c.visible && !st.gamepad) continue;
+    xr.m.identity().extractRotation(st.c.matrixWorld);
+    xr.ray.ray.origin.setFromMatrixPosition(st.c.matrixWorld);
+    xr.ray.ray.direction.set(0,0,-1).applyMatrix4(xr.m);
+    xr.ray.far = 8;
+    const h = xr.ray.intersectObjects(targets, true)[0];
+    if (h && h.distance < 6){ st.hit = h; st.line.scale.z = h.distance; }
+    else {
+      const p = new THREE.Vector3();
+      if (xrMode==='vr' && xr.ray.ray.intersectPlane(floorPlane, p) && p.distanceTo(xr.ray.ray.origin) < 8 && Math.abs(p.x) < ROOM.x-0.3 && p.z > -ROOM.zb+0.3 && p.z < ROOM.zf-0.3){
+        st.floor = p; reticle.position.set(p.x, 0.005, p.z); reticle.visible = true; st.line.scale.z = p.distanceTo(xr.ray.ray.origin);
+      } else st.line.scale.z = 3;
+    }
+    // manches: esquerdo anda, direito gira em passos de 30°
+    const gp = st.gamepad; if (!gp || !gp.axes || gp.axes.length < 4) continue;
+    const ax = gp.axes[2], ay = gp.axes[3];
+    if (st.handedness==='left' && xrMode==='vr' && Math.hypot(ax,ay) > 0.15){
+      const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y=0; dir.normalize();
+      const side = new THREE.Vector3(-dir.z, 0, dir.x);
+      dolly.position.addScaledVector(dir, -ay*1.2*dt).addScaledVector(side, ax*1.2*dt);
+      dolly.position.x = Math.max(-ROOM.x+0.4, Math.min(ROOM.x-0.4, dolly.position.x));
+      dolly.position.z = Math.max(-ROOM.zb+0.4, Math.min(ROOM.zf-0.4, dolly.position.z));
+    }
+    if (st.handedness==='right'){
+      if (Math.abs(ax) > 0.7 && !xr.turnLock[i]){
+        xr.turnLock[i] = true;
+        const head = new THREE.Vector3(); camera.getWorldPosition(head);
+        const ang = -Math.sign(ax)*Math.PI/6;
+        dolly.position.sub(head).applyAxisAngle(new THREE.Vector3(0,1,0), ang).add(head); dolly.rotation.y += ang;
+      } else if (Math.abs(ax) < 0.3) xr.turnLock[i] = false;
+    }
+  }
+  xr.panelT += dt; if (xr.panelT > 0.3){ xr.panelT = 0; drawPanel(); }
+}
+
+renderer.xr.addEventListener('sessionstart', ()=>{
+  controls.enabled = false;
+  camera.position.set(0,0,0); camera.rotation.set(0,0,0);
+  dolly.position.copy(START); dolly.rotation.set(0,0,0);
+  panel.visible = true; xrLabels.forEach(s=>s.visible=true); labels.forEach(l=>l.visible=false); netLabels.forEach(l=>l.visible=false);
+  if (xrMode==='ar'){ room.visible = false; scene.background = null; renderer.setClearAlpha(0); }
+  sun.shadow.mapSize.set(1024,1024); sun.shadow.map?.dispose(); sun.shadow.map = null;
+  drawPanel();
+  log(xrMode==='ar' ? 'Sessão de realidade mista iniciada' : 'Sessão de realidade virtual iniciada');
+});
+renderer.xr.addEventListener('sessionend', ()=>{
+  xrMode = null; controls.enabled = true;
+  dolly.position.set(0,0,0); dolly.rotation.set(0,0,0);
+  camera.position.copy(HOME.pos); controls.target.copy(HOME.tgt); camera.updateProjectionMatrix();
+  panel.visible = false; xrLabels.forEach(s=>s.visible=false); labels.forEach(l=>l.visible=$('btnLabels').getAttribute('aria-pressed')==='true');
+  room.visible = true; scene.background = savedBg; renderer.setClearAlpha(1);
+  sun.shadow.mapSize.set(2048,2048); sun.shadow.map?.dispose(); sun.shadow.map = null;
+  reticle.visible = false;
+});
+renderer.setAnimationLoop(frame);
+</script>
+</body>
+</html>
