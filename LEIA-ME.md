@@ -62,11 +62,12 @@ O **painel flutuante** fica à esquerda da bancada e mostra os indicadores, o es
 No modo **Realidade mista** a sala virtual some e a bancada aparece sobre o ambiente real (passthrough), em tamanho real. É ideal para posicionar o gêmeo digital ao lado da bancada física do laboratório. Nesse modo o teletransporte fica desligado; caminhe fisicamente em volta.
 
 ## 4. Desempenho
-- Dentro do óculos a aplicação ativa renderização foveada e reduz a resolução das sombras (three.js r160).
+- No computador, o botão **Gráficos HD** liga oclusão de ambiente, brilho das luminárias, sombras em alta resolução e reflexos do próprio laboratório. Em máquinas mais fracas, clique para mudar para **Gráficos leves** (a escolha fica salva no navegador).
+- Dentro do óculos a renderização é direta (sem pós-processamento), com renderização foveada e sombras em resolução reduzida (three.js r160).
 - Se ficar pesado, use a velocidade 1× e feche outras abas do navegador do Quest.
 - Os modelos 3D dos controles são baixados automaticamente do CDN público da Immersive Web (precisa de internet); sem internet, o raio de apontar continua funcionando.
 
 ## 5. Referências usadas na modelagem
-- Manual XL4002 (Exsto/Exxer) — lista de peças: SMC LEFS16, LEYG16, LERH50K, MHZL2-16D, MY1B, ZPT25; SCHUNK EGH 80-IOL-N; câmera MVISIA.
+- Manual XL4002 (Exsto/Exxer) — lista de peças: SMC LEFS16, LEYG16, LERH50K, MHZL2-16D, MY1B, ZPT25; SCHUNK Co-act EGH (garra colaborativa); câmera MVISIA.
 - Universal Robots — parâmetros DH do UR3e.
 - Guia do Educador XL4002 — projeto integrado (Loja → MES → Estoque → Processo → Montagem → Expedição).

@@ -189,6 +189,7 @@ button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);bor
     <button id="btnNet" aria-pressed="false">Rede</button>
     <button id="btnDoors" aria-pressed="false">Portas</button>
     <button id="btnLabels" aria-pressed="true">Rótulos</button>
+    <button id="btnGfx" aria-pressed="true" title="Oclusão de ambiente, brilho e reflexos do laboratório">Gráficos HD</button>
     <button id="btnMes">Pedidos</button>
   </div>
 </nav>
@@ -207,6 +208,7 @@ button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);bor
   "three/addons/":"./vendor/three/examples/jsm/"
 }}
 </script>
+
 <script type="module">import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -224,7 +226,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.95;
+renderer.toneMappingExposure = 0.9;
 stage.appendChild(renderer.domElement);
 const labelR = new CSS2DRenderer();
 labelR.setSize(innerWidth, innerHeight);
@@ -248,8 +250,8 @@ controls.enableDamping = true;
 controls.minDistance = 0.25; controls.maxDistance = 6.5;
 controls.maxPolarAngle = 1.55;
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x9a958f, 0.9));
-const sun = new THREE.DirectionalLight(0xffffff, 1.9);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x9a958f, 0.3));
+const sun = new THREE.DirectionalLight(0xfff6ea, 2.8);
 sun.position.set(1.6, 6, 2.6);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -416,53 +418,207 @@ function camera3d(parent, x, y, z, ry){
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.022,0.004,10,32), M.led); ring.position.z=0.066; g.add(ring);
   return { g, ring };
 }
-// SCHUNK EGH 80-IOL-N com kit de adaptação UR (corpo 114 × 86,5 mm, curso 40 mm por mordente)
-function egh80(){
+// SCHUNK Co-act EGH (garra colaborativa, IO-Link, curso 40 mm por mordente) com adaptador UR
+const GRIPPERS = [];
+const EGH_M = {
+  white: new THREE.MeshPhysicalMaterial({ color:0xf1f2f2, roughness:.38, metalness:0, clearcoat:.35, clearcoatRoughness:.35 }),
+  gray: new THREE.MeshPhysicalMaterial({ color:0xa7abae, roughness:.5, metalness:0, clearcoat:.2, clearcoatRoughness:.5 }),
+  grayLt: std(0xbfc3c6,{roughness:.5,metalness:0}),
+  panel: std(0x8a8f93,{roughness:.62,metalness:0}),
+  dark: std(0x1d1f22,{roughness:.55,metalness:.1}),
+  rubber: std(0x151618,{roughness:.9,metalness:0}),
+  steel: std(0xc9cdd1,{roughness:.28,metalness:.9}),
+};
+function coactEGH(){
   const g = new THREE.Group();
-  cyl(0.0315,0.0315,0.012,M.urRing,0,-0.006,0,g,32);                   // flange de adaptação ISO 9409
-  rbox(0.114,0.066,0.0865,0.006,M.egh,0,-0.045,0,g);
-  box(0.116,0.008,0.07,M.eghJaw,0,-0.082,0,g);                          // guia dos mordentes
-  box(0.03,0.016,0.004,std(0x1b5fae),0,-0.04,0.0435,g);                 // etiqueta
-  cyl(0.004,0.004,0.02,M.motor,0.05,-0.03,0.045,g,8).rotation.x=Math.PI/2; // conector M8
+  const cv = (w,h,draw)=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d'),w,h); return tex(c); };
+  // flange de adaptação UR (ISO 9409-1-50-4-M6)
+  cyl(0.0315,0.0315,0.008,M.urRing,0,-0.004,0,g,40);
+  for (let i=0;i<4;i++){ const a=i*Math.PI/2+Math.PI/4; cyl(0.0028,0.0028,0.0015,EGH_M.steel,Math.cos(a)*0.025,-0.0005,Math.sin(a)*0.025,g,10); }
+  // módulo superior cinza (chave de bloqueio / conexão rápida)
+  rbox(0.082,0.026,0.076,0.009,EGH_M.gray,0,-0.021,0,g);
+  const lockTex = cv(256,96,(c,w,h)=>{ c.clearRect(0,0,w,h); c.strokeStyle='#5d6266'; c.fillStyle='#5d6266'; c.lineWidth=5;
+    const lock=(x,open)=>{ c.strokeRect(x-12,44,24,20); c.beginPath(); c.arc(x+(open?8:0),44,9,Math.PI,open?Math.PI*1.75:0); c.stroke(); };
+    lock(72,false); lock(184,true);
+    c.beginPath(); c.arc(128,64,30,Math.PI*1.18,Math.PI*1.82); c.stroke(); c.beginPath(); c.moveTo(150,36); c.lineTo(156,47); c.lineTo(145,47); c.fill(); });
+  for (const sz of [1,-1]){
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(0.05,0.019), new THREE.MeshStandardMaterial({ map:lockTex, roughness:.5, transparent:true, depthWrite:false }));
+    p.position.set(0,-0.021,sz*0.0381); if (sz<0) p.rotation.y=Math.PI; g.add(p);
+    const k = cyl(0.0045,0.0045,0.003,EGH_M.dark,0,-0.0185,sz*0.0388,g,24); k.rotation.x=Math.PI/2;
+    const ks = box(0.0055,0.0012,0.001,EGH_M.steel,0,-0.0185,sz*0.0405,g); ks.castShadow=false;
+  }
+  // anel de LED de status
+  const dots = cv(512,16,(c,w,h)=>{ c.fillStyle='#000'; c.fillRect(0,0,w,h); c.fillStyle='#fff'; for(let x=6;x<w;x+=16){ c.fillRect(x,3,10,10); } });
+  dots.wrapS = THREE.RepeatWrapping; dots.repeat.set(1,1);
+  const ledMat = new THREE.MeshStandardMaterial({ color:0x2a3324, roughness:.3, emissive:0x8ee03a, emissiveMap:dots, emissiveIntensity:2.2 });
+  rbox(0.0836,0.0055,0.0776,0.0026,ledMat,0,-0.0365,0,g);
+  // corpo branco (perfil frontal alargando para baixo, cantos arredondados)
+  const sh = new THREE.Shape();
+  const T=-0.044, B=-0.092;
+  sh.moveTo(-0.036,T); sh.lineTo(0.036,T);
+  sh.bezierCurveTo(0.038,-0.062, 0.048,-0.068, 0.048,-0.082); sh.lineTo(0.048,B+0.004); sh.quadraticCurveTo(0.048,B,0.044,B);
+  sh.lineTo(-0.044,B); sh.quadraticCurveTo(-0.048,B,-0.048,B+0.004); sh.lineTo(-0.048,-0.082);
+  sh.bezierCurveTo(-0.048,-0.068, -0.038,-0.062, -0.036,T);
+  const DEP = 0.064, BT = 0.007;
+  const bodyGeo = new THREE.ExtrudeGeometry(sh, { depth:DEP, bevelEnabled:true, bevelThickness:BT, bevelSize:0.005, bevelSegments:6, curveSegments:24 });
+  bodyGeo.translate(0,0,-DEP/2);
+  const body = new THREE.Mesh(bodyGeo, EGH_M.white); body.castShadow = body.receiveShadow = true; g.add(body);
+  const FZ = DEP/2 + BT;
+  // insertos laterais cinza escuro e placa SCHUNK (frente e verso)
+  const ins = new THREE.Shape();
+  ins.moveTo(0.027,-0.049); ins.quadraticCurveTo(0.0445,-0.058, 0.0455,-0.083); ins.quadraticCurveTo(0.0455,-0.089, 0.0405,-0.0875);
+  ins.quadraticCurveTo(0.0335,-0.067, 0.0225,-0.0535); ins.quadraticCurveTo(0.022,-0.050, 0.027,-0.049);
+  const insGeo = new THREE.ExtrudeGeometry(ins, { depth:0.0012, bevelEnabled:true, bevelThickness:0.0004, bevelSize:0.0004, bevelSegments:2, curveSegments:16 });
+  const badge = cv(256,96,(c,w,h)=>{ c.fillStyle='#f6f7f7'; c.fillRect(0,0,w,h); const r=22; c.fillStyle='#1d4f9c'; c.beginPath(); c.roundRect(14,14,w-28,h-28,r); c.fill();
+    c.fillStyle='#fff'; c.font='bold 40px Arial, sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText('SCHUNK',w/2,h/2+2); });
+  const raised = new THREE.Shape(); raised.moveTo(-0.019,-0.054); raised.lineTo(0.019,-0.054); raised.quadraticCurveTo(0.024,-0.054,0.024,-0.060); raised.lineTo(0.022,-0.078); raised.quadraticCurveTo(0.021,-0.083,0.015,-0.083); raised.lineTo(-0.015,-0.083); raised.quadraticCurveTo(-0.021,-0.083,-0.022,-0.078); raised.lineTo(-0.024,-0.060); raised.quadraticCurveTo(-0.024,-0.054,-0.019,-0.054);
+  const raisedGeo = new THREE.ExtrudeGeometry(raised, { depth:0.001, bevelEnabled:true, bevelThickness:0.0012, bevelSize:0.0016, bevelSegments:4, curveSegments:12 });
+  for (const sz of [1,-1]){
+    const face = new THREE.Group(); face.position.z = sz*FZ; if (sz<0) face.rotation.y = Math.PI; g.add(face);
+    for (const sx of [1,-1]){ const m=new THREE.Mesh(insGeo, EGH_M.panel); m.scale.x=sx; m.position.z=-0.0004; face.add(m); }
+    const rs = new THREE.Mesh(raisedGeo, EGH_M.white); rs.position.z=-0.0008; face.add(rs);
+    const bp = new THREE.Mesh(new THREE.PlaneGeometry(0.03,0.0113), new THREE.MeshStandardMaterial({ map:badge, roughness:.35 })); bp.position.set(0,-0.068,0.0021); face.add(bp);
+  }
+  // placa inferior cinza + guia dos mordentes
+  rbox(0.1,0.0065,0.078,0.0025,EGH_M.grayLt,0,-0.1,0,g);
+  for (const sz of [1,-1]) for (const x of [-0.024,0,0.024]) box(0.006,0.0025,0.001,EGH_M.white,x,-0.1,sz*0.0392,g).castShadow=false;
+  box(0.096,0.0065,0.034,EGH_M.dark,0,-0.1062,0,g);
+  // dedos articulados (formato em S, articulações com parafusos recartilhados e porcas sextavadas)
+  const curve = new THREE.CatmullRomCurve3([[0,-0.108],[0,-0.117],[0.0075,-0.127],[0.0105,-0.137],[0.007,-0.1465],[0,-0.1535],[0,-0.166]].map(p=>new THREE.Vector3(p[0],p[1],0)));
+  const pts = curve.getSpacedPoints(48), HW = 0.0055;
+  const outer=[], inner=[];
+  pts.forEach((p,i)=>{ const q=pts[Math.min(i+1,pts.length-1)], o=pts[Math.max(i-1,0)]; const tx=q.x-o.x, ty=q.y-o.y, l=Math.hypot(tx,ty); const nx=ty/l, ny=-tx/l; // normal apontando para fora (+x)
+    outer.push(new THREE.Vector2(p.x+nx*HW, p.y+ny*HW)); inner.push(new THREE.Vector2(p.x-nx*HW, p.y-ny*HW)); });
+  const fs = new THREE.Shape([...outer, ...inner.reverse()]);
+  const FD = 0.016;
+  const fingerGeo = new THREE.ExtrudeGeometry(fs, { depth:FD, bevelEnabled:true, bevelThickness:0.0015, bevelSize:0.0012, bevelSegments:3, curveSegments:4 });
+  fingerGeo.translate(0,0,-FD/2);
+  const knurl = new THREE.CylinderGeometry(0.0042,0.0042,0.0035,18); knurl.rotateX(Math.PI/2);
+  const hexG = new THREE.CylinderGeometry(0.0038,0.0038,0.0028,6); hexG.rotateX(Math.PI/2);
+  const capG = new THREE.CylinderGeometry(0.0021,0.0021,0.0012,12); capG.rotateX(Math.PI/2);
   const jaws = [];
   for (const s of [-1,1]){
     const j = new THREE.Group(); g.add(j);
-    box(0.024,0.014,0.05,M.eghJaw,0,-0.093,0,j);
-    box(0.008,0.062,0.03,M.alu,s*-0.004,-0.13,0,j);                    // dedo
-    box(0.004,0.02,0.026,M.cup,s*-0.009,-0.15,0,j);                    // pastilha de borracha
+    const sideG = new THREE.Group(); sideG.scale.x = s; j.add(sideG);     // espelha o dedo esquerdo
+    box(0.019,0.006,0.026,EGH_M.dark,0,-0.1095,0,sideG);                 // mordente de base
+    const fm = new THREE.Mesh(fingerGeo, EGH_M.white); fm.castShadow = fm.receiveShadow = true; sideG.add(fm);
+    for (const sz of [1,-1]){
+      const zf = sz*(FD/2+0.0015);
+      [[0.0065,-0.1265,'k'],[0.0055,-0.1475,'h'],[0,-0.1125,'c']].forEach(([x,y,t])=>{
+        const m = new THREE.Mesh(t==='k'?knurl:t==='h'?hexG:capG, t==='k'?EGH_M.grayLt:EGH_M.steel); m.position.set(x,y,zf+sz*(t==='k'?0.0017:t==='h'?0.0013:0.0005)); m.castShadow=true; sideG.add(m);
+        if (t!=='c'){ const c=new THREE.Mesh(capG,EGH_M.dark); c.position.set(x,y,zf+sz*(t==='k'?0.0035:0.0028)); sideG.add(c); }
+      });
+    }
+    rbox(0.0045,0.019,0.017,0.0012,EGH_M.rubber,-0.0089,-0.1555,0,sideG);   // pastilha de borracha
     jaws.push({ j, s });
   }
-  return { g, TCP:0.155, set(half){ jaws.forEach(({j,s})=>{ j.position.x = s*(half+0.011); }); } };
+  const o = { g, TCP:0.155, led:ledMat, closed:false,
+    set(half){ jaws.forEach(({j,s})=>{ j.position.x = s*(half+0.011); }); this.closed = half < 0.04; },
+    setLed(c){ ledMat.emissive.setHex(c); } };
+  GRIPPERS.push(o);
+  return o;
 }
+const egh80 = coactEGH;
 // Universal Robots UR3e — parâmetros DH oficiais (d1 151,85 · a2 243,55 · a3 213,2 · d4 131,05 · d5 85,35 · d6 92,1 mm)
 const UR = { d1:0.15185, a2:0.24355, a3:0.2132, d4:0.13105, d5:0.08535, d6:0.0921 };
+// aparência UR e-series: carcaças de alumínio cinza-claro com cantos arredondados, tampas azuis nas juntas,
+// anéis de vedação escuros entre as partes que giram, tubos com transição suave para as carcaças
+const URM = {
+  body: new THREE.MeshPhysicalMaterial({ color:0xdde0e3, roughness:.36, metalness:.1, clearcoat:.3, clearcoatRoughness:.45 }),
+  lid: new THREE.MeshPhysicalMaterial({ color:0x93c3e6, roughness:.3, metalness:0, clearcoat:.6, clearcoatRoughness:.25 }),
+  lidRim: std(0xb9cfe0,{roughness:.4,metalness:0}),
+  seal: std(0x26292c,{roughness:.6,metalness:.1}),
+  flange: std(0xbfc4c8,{roughness:.28,metalness:.85}),
+  dark: std(0x2e3236,{roughness:.42,metalness:.35}),
+  cable: std(0x1a1b1d,{roughness:.7,metalness:0}),
+};
+M.urGray = URM.body; M.urCap = URM.lid;
+const V2 = (x,y)=>new THREE.Vector2(x,y);
+function orientGeo(geo, axis, sign=1){ if (sign<0) geo.rotateX(Math.PI); if (axis==='z') geo.rotateX(Math.PI/2); else if (axis==='x') geo.rotateZ(-Math.PI/2); return geo; }
+function latheMesh(pts, mat, axis, parent, cx=0, cy=0, cz=0, sign=1, seg=56){
+  const geo = orientGeo(new THREE.LatheGeometry(pts, seg), axis, sign); geo.translate(cx,cy,cz);
+  const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; parent.add(m); return m;
+}
+// cilindro com filetes nas bordas (f0 no início do eixo, f1 no fim), de a0 a a1 ao longo do eixo
+function urCyl(R, a0, a1, f0, f1, mat, axis, parent, cx=0, cy=0, cz=0){
+  const p = [V2(0,a0)];
+  const arc = (ox,oy,r,t0,t1)=>{ for (let i=0;i<=8;i++){ const t=t0+(t1-t0)*i/8; p.push(V2(ox+r*Math.cos(t), oy+r*Math.sin(t))); } };
+  if (f0>0) arc(R-f0, a0+f0, f0, -Math.PI/2, 0); else p.push(V2(R,a0));
+  if (f1>0) arc(R-f1, a1-f1, f1, 0, Math.PI/2); else p.push(V2(R,a1));
+  p.push(V2(0,a1));
+  return latheMesh(p, mat, axis, parent, cx, cy, cz);
+}
+// tampa azul da junta (levemente abaulada, com friso) apoiada na face em 'at', voltada para 'sign'
+function urLid(r, axis, sign, at, parent, cx=0, cy=0, cz=0){
+  const off = (v)=> axis==='x' ? [cx+v,cy,cz] : axis==='y' ? [cx,cy+v,cz] : [cx,cy,cz+v];
+  latheMesh([V2(0,0),V2(r+0.0012,0),V2(r+0.0012,0.0012),V2(0,0.0012)], URM.lidRim, axis, parent, ...off(at), sign);
+  latheMesh([V2(0,0.0008),V2(r,0.0008),V2(r-0.0006,0.0028),V2(r*0.9,0.0036),V2(r*0.62,0.0038),V2(r*0.58,0.0046),V2(0,0.0052)], URM.lid, axis, parent, ...off(at+sign*0.0004), sign);
+}
+// transição tubo → carcaça: concordância côncava que nasce tangente à carcaça cilíndrica (eixo z) e morre no tubo (eixo x)
+function urFlare(Rh, rT, xc, dir, parent, z){
+  const d = Rh*0.6, rW = Math.sqrt(Rh*Rh - d*d), len = Math.max(0.012, (rW - rT)*3.2);
+  const p = []; for (let i=0;i<=16;i++){ const t=i/16; p.push(V2(rT + (rW-rT)*Math.pow(1-t, 2.6), xc + dir*(d + len*t))); }
+  if (dir < 0) p.reverse();
+  return latheMesh(p, URM.body, 'x', parent, 0, 0, z);
+}
+const urSeal = (R, axis, at, parent, cx=0, cy=0, cz=0) => urCyl(R, at-0.002, at+0.002, 0, 0, URM.seal, axis, parent, cx, cy, cz);
 function ur3e(){
   const base = new THREE.Group();
-  cyl(0.064,0.064,0.012,M.urRing,0,0.006,0,base,40);
-  cyl(0.047,0.05,0.07,M.urGray,0,0.047,0,base,40);
-  cyl(0.0475,0.0475,0.012,M.urCap,0,0.088,0,base,40);
+  // flange de fixação Ø128 com 4 parafusos, corpo da base e conector do cabo
+  urCyl(0.064, 0, 0.011, 0.001, 0.003, URM.flange, 'y', base);
+  for (let i=0;i<4;i++){ const a=Math.PI/4+i*Math.PI/2; cyl(0.0052,0.0052,0.004,URM.dark,Math.cos(a)*0.054,0.013,Math.sin(a)*0.054,base,12); }
+  urCyl(0.045, 0.011, 0.088, 0.0, 0.003, URM.body, 'y', base);
+  urSeal(0.0445, 'y', 0.09, base);
+  { const c = cyl(0.011,0.011,0.026,URM.dark,0,0.034,-0.056,base,20); c.rotation.x=Math.PI/2;
+    const k = cyl(0.0125,0.0125,0.01,URM.seal,0,0.034,-0.072,base,20); k.rotation.x=Math.PI/2;
+    const path = new THREE.CatmullRomCurve3([new THREE.Vector3(0,0.034,-0.075),new THREE.Vector3(0,0.03,-0.1),new THREE.Vector3(0,0.012,-0.125),new THREE.Vector3(0.02,0.006,-0.2),new THREE.Vector3(0.05,0.006,-0.3)]);
+    const cb = new THREE.Mesh(new THREE.TubeGeometry(path, 40, 0.0055, 10), URM.cable); cb.castShadow=true; base.add(cb); }
   const yaw = new THREE.Group(); yaw.position.y = 0.094; base.add(yaw);
-  cyl(0.046,0.046,0.03,M.urGray,0,0.015,0,yaw,40);
-  const housing = (parent, r, len, z0, z1, capEnd=true) => { const m=cyl(r,r,z1-z0,M.urGray,0,0,(z0+z1)/2,parent,40); m.rotation.x=Math.PI/2; if (capEnd){ const c=cyl(r*0.96,r*0.96,0.008,M.urCap,0,0,z1+0.002,parent,40); c.rotation.x=Math.PI/2; const rr=cyl(r*0.55,r*0.55,0.003,M.urRing,0,0,z1+0.006,parent,24); rr.rotation.x=Math.PI/2; } return m; };
-  const tube = (parent, r, x0, x1, z) => { const geo=new THREE.CylinderGeometry(r,r,x1-x0,32); geo.rotateZ(-Math.PI/2); geo.translate((x0+x1)/2,0,z); const m=new THREE.Mesh(geo,M.urGray); m.castShadow=true; parent.add(m); return m; };
+  // J1 (coluna) → J2 (ombro): carcaça horizontal com tampa azul voltada para trás
+  urCyl(0.045, -0.002, UR.d1-0.094, 0, 0, URM.body, 'y', yaw);
   const sh = new THREE.Group(); sh.position.y = UR.d1 - 0.094; yaw.add(sh);
-  cyl(0.046,0.046,0.06,M.urGray,0,-0.03,0,sh,40);                       // pescoço J1→J2
-  housing(sh, 0.046, 0.12, -0.046, 0.075);
+  urCyl(0.045, -0.052, 0.064, 0.005, 0.002, URM.body, 'z', sh);
+  urLid(0.04, 'z', -1, -0.052, sh);
+  urSeal(0.0445, 'z', 0.066, sh);
+  // braço superior (gira com J2)
   const p2 = new THREE.Group(); sh.add(p2);
-  housing(p2, 0.044, 0.1, 0.06, 0.14, false);
-  tube(p2, 0.029, 0.03, UR.a2-0.03, 0.12);
+  urCyl(0.045, 0.068, 0.172, 0.002, 0.028, URM.body, 'z', p2);
+  urCyl(0.0305, 0.03, UR.a2-0.03, 0, 0, URM.body, 'x', p2, 0, 0, 0.12);
+  urFlare(0.045, 0.0305, 0, 1, p2, 0.12);
+  urFlare(0.0375, 0.0305, UR.a2, -1, p2, 0.12);
+  // cotovelo: estator de J3 no braço superior, tampa azul para fora
+  urCyl(0.0375, 0.074, 0.166, 0.002, 0.004, URM.body, 'z', p2, UR.a2, 0, 0);
+  urLid(0.0335, 'z', 1, 0.166, p2, UR.a2, 0, 0);
+  urSeal(0.037, 'z', 0.072, p2, UR.a2, 0, 0);
+  // antebraço (gira com J3)
   const el = new THREE.Group(); el.position.x = UR.a2; p2.add(el);
-  housing(el, 0.038, 0.1, 0.03, 0.15);
-  tube(el, 0.024, 0.03, UR.a3-0.03, 0.035);
+  urCyl(0.0375, -0.017, 0.07, 0.02, 0.002, URM.body, 'z', el);
+  urCyl(0.0225, 0.03, UR.a3-0.025, 0, 0, URM.body, 'x', el, 0, 0, 0.027);
+  urFlare(0.0375, 0.0225, 0, 1, el, 0.027);
+  urFlare(0.032, 0.0225, UR.a3, -1, el, 0.027);
+  // punho 1: estator de J4 na ponta do antebraço, tampa voltada para dentro
+  urCyl(0.032, -0.008, 0.066, 0.004, 0.002, URM.body, 'z', el, UR.a3, 0, 0);
+  urLid(0.0285, 'z', -1, -0.008, el, UR.a3, 0, 0);
+  urSeal(0.0315, 'z', 0.068, el, UR.a3, 0, 0);
   const w1 = new THREE.Group(); w1.position.x = UR.a3; el.add(w1);
-  housing(w1, 0.032, 0.1, 0.0, UR.d4+0.032);
+  urCyl(0.032, 0.07, UR.d4, 0, 0, URM.body, 'z', w1);
+  // punho 2: eixo J5 radial, tampa voltada para a base
   const w2 = new THREE.Group(); w2.position.set(0, 0, UR.d4); w1.add(w2);
-  { const m=cyl(0.032,0.032,UR.d5+0.03,M.urGray,(UR.d5+0.03)/2-0.0,0,0,w2,40); m.rotation.z=Math.PI/2; const c=cyl(0.031,0.031,0.008,M.urCap,UR.d5+0.034,0,0,w2,40); c.rotation.z=Math.PI/2; }
+  urCyl(0.032, -0.036, 0.04, 0.004, 0.002, URM.body, 'x', w2);
+  urLid(0.0285, 'x', -1, -0.036, w2);
+  urSeal(0.0315, 'x', 0.042, w2);
+  urCyl(0.032, 0.044, UR.d5, 0, 0, URM.body, 'x', w2);
+  // punho 3: eixo J6 vertical, tampa azul em cima, anel escuro e flange de ferramenta ISO 9409-1-50-4-M6
   const w3 = new THREE.Group(); w3.position.set(UR.d5, 0, 0); w2.add(w3);
-  cyl(0.032,0.032,UR.d6-0.012,M.urGray,0,-(UR.d6-0.012)/2,0,w3,40);
-  cyl(0.031,0.031,0.008,M.urCap,0,-UR.d6+0.008,0,w3,40);
+  urCyl(0.032, -0.058, 0.036, 0.002, 0.004, URM.body, 'y', w3);
+  urLid(0.0285, 'y', 1, 0.036, w3);
+  urSeal(0.0315, 'y', -0.06, w3);
   const tool = new THREE.Group(); tool.position.y = -UR.d6; w3.add(tool);
-  cyl(0.0315,0.0315,0.004,M.urRing,0,-0.002,0,tool,32);
+  urCyl(0.032, 0.015, 0.0302, 0.0, 0.0, URM.body, 'y', tool);
+  urCyl(0.0315, 0.009, 0.015, 0.0, 0.0, URM.dark, 'y', tool);
+  urCyl(0.0315, 0, 0.009, 0.0015, 0, URM.flange, 'y', tool);
+  { const c = cyl(0.0048,0.0048,0.012,URM.seal,0.037,0.02,0,tool,14); c.rotation.z=Math.PI/2;      // conector de ferramenta M8 (8 pinos)
+    const n = cyl(0.0055,0.0055,0.006,URM.flange,0.045,0.02,0,tool,14); n.rotation.z=Math.PI/2; }
   const q = [0,0,0,0,0,0];
   function setQ(q1,q2,q3,q4,q6){ yaw.rotation.y=q1; p2.rotation.z=q2; el.rotation.z=q3; w1.rotation.z=q4; tool.rotation.y=q6; q[0]=q1; q[1]=q2; q[2]=q3; q[3]=q4; q[4]=-Math.PI/2; q[5]=q6; }
   // IK (ferramenta para baixo): alvo do flange no referencial da base; retorna false se fora do alcance
@@ -1118,7 +1274,7 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
   stations.push(st);
 }
 
-/* ---------- 3 · MONTAGEM : UR3e + SCHUNK EGH 80-IOL + câmera MVISIA + base de translado ---------- */
+/* ---------- 3 · MONTAGEM : UR3e + SCHUNK Co-act EGH + câmera MVISIA + base de translado ---------- */
 {
   const b = BENCH[2], g = benches[2];
   const BX = -0.06, BZ = -0.10, BASE_Y = TABLE_Y + 0.015;
@@ -1149,7 +1305,7 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
   box(0.07,0.012,0.03,M.aluDark,-0.035,BELT_Y-TABLE_Y+0.012,0,trB);
   vacuumCup(trB, -0.07, BELT_Y-TABLE_Y+BH/2-0.004, 0.015, 'z');
   const cupZ = f => FEED_Z - BW/2 + f*(ZB - FEED_Z);
-  // UR3e sobre chapa de fixação + garra SCHUNK EGH 80
+  // UR3e sobre chapa de fixação + garra colaborativa SCHUNK Co-act EGH
   box(0.16,0.015,0.16,M.aluDark,BX,TABLE_Y+0.0075,BZ,g);
   const ur = ur3e(); ur.base.position.set(BX, BASE_Y, BZ); g.add(ur.base);
   const egh = egh80(); ur.tool.add(egh.g);
@@ -1167,7 +1323,7 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
   const STOP_S = sAt(stopX);
   // pose do robô em coordenadas cilíndricas ao redor da base (evita passar pelo eixo J1)
   const polar = (x,z) => ({ a:Math.atan2(z-BZ, x-BX), rr:Math.hypot(x-BX, z-BZ) });
-  const OPEN = 0.045;
+  const OPEN = 0.038;                                               // Co-act EGH: 40 mm por mordente
   const HOMEP = { x:0.13, y:TABLE_Y+0.32, z:0.02 };
   const pose = { ...polar(HOMEP.x, HOMEP.z), y:HOMEP.y, w:0, gw:OPEN };
   const unwrap = (a, ref) => ref + Math.atan2(Math.sin(a-ref), Math.cos(a-ref));
@@ -1188,8 +1344,8 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
   const hold = (obj, dy) => { scene.attach(obj); held = { obj, dy }; };
   const st = {
     name:'Montagem', run, f, stopS:STOP_S, A,
-    desc:'Empilha os andares do Smart Block e encaixa as lâminas. A base de translado puxa cada base da esteira, e o robô colaborativo UR3e, com garra SCHUNK EGH 80, a coloca na posição: andar inferior à direita, do meio no centro, superior à esquerda. O robô pega as lâminas no depósito do processo, mostra cada uma à câmera MVISIA, encaixa nas ranhuras, põe a tampa no andar superior, empilha os andares e devolve o pedido à esteira.',
-    kit:'CLP S7-1500 · IHM KTP700 · Universal Robots UR3e (alcance 500 mm, carga 3 kg) · garra SCHUNK EGH 80-IOL-N (IO-Link, 40 mm por mordente) · câmera MVISIA · magazine de tampa e base de montagem · rampa alimentadora · base de translado com ventosa ZPT25 · válvulas VQC',
+    desc:'Empilha os andares do Smart Block e encaixa as lâminas. A base de translado puxa cada base da esteira, e o robô colaborativo UR3e, com a garra colaborativa SCHUNK Co-act EGH, a coloca na posição: andar inferior à direita, do meio no centro, superior à esquerda. O robô pega as lâminas no depósito do processo, mostra cada uma à câmera MVISIA, encaixa nas ranhuras, põe a tampa no andar superior, empilha os andares e devolve o pedido à esteira.',
+    kit:'CLP S7-1500 · IHM KTP700 · Universal Robots UR3e (alcance 500 mm, carga 3 kg) · garra colaborativa SCHUNK Co-act EGH (IO-Link, anel de LED de status, 40 mm por mordente) · câmera MVISIA · magazine de tampa e base de montagem · rampa alimentadora · base de translado com ventosa ZPT25 · válvulas VQC',
     msg:'Aguardando base', prog:0,
     busy(){ return run.busy || frun.busy; },
     detail(){ return A.order ? `OP${A.order.id} · ${A.placed.filter(Boolean).length}/${A.order.floors.length} andar(es) na base` : `${belt.filter(x=>x.target==='M').length} base(s) a caminho`; },
@@ -1339,7 +1495,7 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
       ['Q','C/Q4','Válvulas: recua translado', f.back],
       ['Q','C/Q4','Válvulas: vácuo', f.vac],
       ['Q','C/Q4','Válvulas: stopper', f.stop],
-      ['A','EGH 80','Abertura dos dedos', (pose.gw*2000).toFixed(0)+' mm'],
+      ['A','Co-act EGH','Abertura dos dedos', (pose.gw*2000).toFixed(0)+' mm'],
       ['A','MVISIA','Cor detectada', f.cam ? `${f.cam} ${f.camOk?'✓':'✗'}` : '—'],
       ['sec','UR3e · juntas (modelo)'],
       ['A','J1','Base', d(J[0])], ['A','J2','Ombro', d(J[1])], ['A','J3','Cotovelo', d(J[2])], ['A','J4','Punho 1', d(J[3])], ['A','J5','Punho 2', d(J[4])], ['A','J6','Punho 3', d(J[5])],
@@ -1465,16 +1621,23 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
 const tower = {}; let dome;
 {
   const g = integ, topY = 0.05 + 1.08;
+  rbox(0.64, 0.026, 0.64, 0.008, M.frame, 0, topY-0.012, 0, g);                         // tampo superior
+  box(0.5, 0.004, 0.5, M.black, 0, topY+0.002, 0, g);
   rbox(0.34,0.012,0.24,0.004,M.black,0,topY+0.006,-0.02,g);
+  box(0.29,0.002,0.1,M.dark,0,topY+0.013,-0.05,g); box(0.09,0.002,0.06,M.dark,0,topY+0.013,0.05,g);
   const lid = rbox(0.34,0.22,0.01,0.004,M.black,0,topY+0.12,-0.14,g); lid.rotation.x=-0.25;
-  const scr = box(0.31,0.19,0.002,std(0x0f2a18,{emissive:0x0e3a1a}),0,topY+0.12,-0.133,g); scr.rotation.x=-0.25;
+  const sc = document.createElement('canvas'); sc.width=512; sc.height=320; const sg = sc.getContext('2d');
+  sg.fillStyle='#0d1012'; sg.fillRect(0,0,512,320); sg.fillStyle='#62d26f'; sg.fillRect(0,0,512,34);
+  sg.fillStyle='#0b2410'; sg.font='bold 20px Arial'; sg.fillText('MES · Acompanhamento de OPs', 12, 24);
+  ['Estoque','Processo','Montagem','Expedição','Esteira'].forEach((t,i)=>{ sg.fillStyle= i%2? '#1a2024':'#151a1d'; sg.fillRect(12,50+i*48,488,42); sg.fillStyle='#e6ecee'; sg.font='18px Arial'; sg.fillText(t, 24, 77+i*48); sg.fillStyle=['#62d26f','#5aa9e6','#f0b43c','#62d26f','#8d999e'][i]; sg.fillRect(200,62+i*48,120+i*30,18); });
+  const scr = new THREE.Mesh(new THREE.PlaneGeometry(0.31,0.19), new THREE.MeshBasicMaterial({ map:tex(sc), toneMapped:false })); scr.position.set(0,topY+0.12,-0.1335+0.0062); scr.rotation.x=-0.25; g.add(scr);
   const yawG = new THREE.Group(); yawG.position.set(-0.22, topY+0.02, -0.2); g.add(yawG);
   cyl(0.03,0.035,0.03,M.white,0,0,0,yawG);
   dome = new THREE.Group(); dome.position.y=0.05; yawG.add(dome);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.045,24,16), M.white); head.castShadow=true; dome.add(head);
   cyl(0.018,0.018,0.02,M.black,0,0,0.04,dome).rotation.x=Math.PI/2;
   dome.userData.yaw = yawG;
-  cyl(0.012,0.012,0.12,M.aluDark,0.24,topY+0.06,-0.2,g);
+  cyl(0.012,0.012,0.158,M.aluDark,0.24,topY+0.079,-0.2,g); cyl(0.024,0.026,0.01,M.black,0.24,topY+0.005,-0.2,g);
   [['red',0xff3b3b],['amber',0xffb020],['green',0x2ee06e]].forEach(([k,c],i)=>{ const m=new THREE.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:0, transparent:true, opacity:.9, roughness:.3 }); cyl(0.022,0.022,0.04,m,0.24,topY+0.26-i*0.042,-0.2,g); tower[k]=m; });
   const fp = new THREE.Group(); fp.position.set(0.18, topY-0.12, 0.31); g.add(fp);
   const eb = cyl(0.03,0.03,0.014,M.estopBase,0,0,0,fp); eb.rotation.x=Math.PI/2;
@@ -1500,6 +1663,93 @@ const tower = {}; let dome;
   });
 }
 
+
+/* =============== renderização realista: texturas procedurais, reflexos do próprio laboratório e pós-processamento =============== */
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const procTex = (size, draw, repeat=1, srgb=false) => {
+  const c = document.createElement('canvas'); c.width = c.height = size; draw(c.getContext('2d'), size);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); t.anisotropy = 8;
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t;
+};
+const noisePx = (g, s, lo, hi) => { const d = g.createImageData(s, s); for (let i=0;i<d.data.length;i+=4){ const v = lo + Math.random()*(hi-lo); d.data[i]=d.data[i+1]=d.data[i+2]=v; d.data[i+3]=255; } g.putImageData(d,0,0); };
+// pintura eletrostática (textura casca de laranja fina)
+const TEX_POWDER = procTex(256, (g,s)=>{ noisePx(g,s,110,150); g.filter='blur(1px)'; g.drawImage(g.canvas,0,0); }, 3);
+// alumínio escovado (riscos longitudinais)
+const TEX_BRUSH = procTex(512, (g,s)=>{ g.fillStyle='#b8b8b8'; g.fillRect(0,0,s,s); for (let i=0;i<2600;i++){ const y=Math.random()*s, v=150+Math.random()*105|0; g.strokeStyle=`rgba(${v},${v},${v},${0.25+Math.random()*0.5})`; g.lineWidth=Math.random()*1.4+0.3; g.beginPath(); const x=Math.random()*s; g.moveTo(x-s*0.6,y); g.lineTo(x+s*0.6,y+(Math.random()-.5)*2); g.stroke(); } });
+// massa corrida / tinta acrílica nas paredes e teto
+const TEX_WALL = procTex(256, (g,s)=>{ noisePx(g,s,100,156); g.filter='blur(2px)'; g.drawImage(g.canvas,0,0); }, 6);
+
+for (const m of [M.frame, M.body, M.black, M.dark, M.plinth, M.profileBlk, M.tampa, M.hmi]){ if (!m) continue; m.bumpMap = TEX_POWDER; m.bumpScale = 0.35; m.needsUpdate = true; }
+for (const m of [M.alu, M.aluDark, M.profile, M.smcBody, M.plate, M.rod, M.eghJaw]){ if (!m) continue; m.roughnessMap = TEX_BRUSH; m.roughness = Math.min(1, m.roughness*1.25); m.bumpMap = TEX_BRUSH; m.bumpScale = 0.08; m.needsUpdate = true; }
+M.door.roughness = 0.06; M.door.envMapIntensity = 1.4;
+EGH_M.white.bumpMap = TEX_POWDER; EGH_M.white.bumpScale = 0.12;
+M.urGray.bumpMap = TEX_POWDER; M.urGray.bumpScale = 0.12;
+room.traverse(o=>{
+  if (!o.isMesh || Array.isArray(o.material)) return;
+  const m = o.material;
+  if (m.map && o.geometry.type==='PlaneGeometry' && o.rotation.x < 0){       // piso vinílico: relevo e brilho acompanhando os veios
+    m.roughnessMap = m.map; m.bumpMap = m.map; m.bumpScale = 0.6; m.roughness = 0.62; m.envMapIntensity = 0.8; m.needsUpdate = true; return;
+  }
+  if (!m.map && !m.transparent && m.roughness >= 0.85 && m.isMeshStandardMaterial && !m.bumpMap){ m.bumpMap = TEX_WALL; m.bumpScale = 0.25; m.needsUpdate = true; }
+});
+
+/* reflexos: o mapa de ambiente passa a ser o próprio laboratório (captura cúbica a partir do centro da célula) */
+function bakeEnv(){
+  const hide = [];
+  scene.traverse(o=>{ if (o.isCSS2DObject || o.userData.noEnv) { if (o.visible){ hide.push(o); o.visible=false; } } });
+  const old = scene.environment;
+  scene.position.set(-0.2, -1.45, -0.6); scene.updateMatrixWorld(true);
+  const rt = pmrem.fromScene(scene, 0.015, 0.05, 30);
+  scene.position.set(0,0,0); scene.updateMatrixWorld(true);
+  hide.forEach(o=>o.visible=true);
+  scene.environment = rt.texture; scene.environmentIntensity = 0.5;
+  if (old && old !== rt.texture) old.dispose?.();
+}
+
+/* pós-processamento (somente na tela; dentro do óculos a renderização é direta) */
+const GFX = { hq: true };
+try { const v = localStorage.getItem('smart40.gfx'); if (v!==null) GFX.hq = v==='1'; else if (matchMedia('(pointer:coarse)').matches || (navigator.hardwareConcurrency||8) <= 4) GFX.hq = false; } catch(e){}
+const gfxPR = () => Math.min(devicePixelRatio, 1.5);
+const composerRT = new THREE.WebGLRenderTarget(innerWidth*gfxPR(), innerHeight*gfxPR(), { type:THREE.HalfFloatType, samples:4 });
+const composer = new EffectComposer(renderer, composerRT);
+composer.setPixelRatio(gfxPR()); composer.setSize(innerWidth, innerHeight);
+composer.addPass(new RenderPass(scene, camera));
+const gtao = new GTAOPass(scene, camera, innerWidth, innerHeight);
+gtao.updateGtaoMaterial({ radius:0.3, distanceExponent:1.4, thickness:1.2, scale:1.0, samples:16, distanceFallOff:1.0, screenSpaceRadius:false });
+gtao.updatePdMaterial({ lumaPhi:10, depthPhi:2, normalPhi:3, radius:6, rings:2, samples:16 });
+gtao.blendIntensity = 1.0;
+// vidro, acrílico, adesivos, rótulos e linhas não geram sombra de contato
+gtao.overrideVisibility = function(){
+  const cache = this._visibilityCache;
+  this.scene.traverse(o=>{ cache.set(o, o.visible);
+    if (o.isPoints || o.isLine || o.isSprite) o.visible = false;
+    else if (o.isMesh){ const m = Array.isArray(o.material) ? o.material[0] : o.material; if (m.transparent || m.isMeshBasicMaterial || o.userData.noAO) o.visible = false; } });
+};
+composer.addPass(gtao);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.18, 0.45, 0.95);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+addEventListener('resize', ()=>{ composer.setPixelRatio(gfxPR()); composer.setSize(innerWidth, innerHeight); });
+
+function applyGfx(){
+  sun.shadow.mapSize.set(GFX.hq ? 4096 : 2048, GFX.hq ? 4096 : 2048); sun.shadow.map?.dispose(); sun.shadow.map = null;
+  const b = document.getElementById('btnGfx'); if (b){ b.setAttribute('aria-pressed', GFX.hq); b.textContent = GFX.hq ? 'Gráficos HD' : 'Gráficos leves'; }
+}
+document.getElementById('btnGfx')?.addEventListener('click', ()=>{ GFX.hq = !GFX.hq; try { localStorage.setItem('smart40.gfx', GFX.hq?'1':'0'); } catch(e){} applyGfx(); });
+applyGfx();
+
+function renderFrame(direct=false){
+  for (const e of GRIPPERS) e.setLed(S.estop ? (Math.sin(performance.now()/180) > 0 ? 0xff2a1a : 0x3a0806) : 0x8ee03a);
+  if (GFX.hq && !direct) composer.render(); else renderer.render(scene, camera);
+}
+// captura o ambiente depois que piso e marca terminarem de carregar
+THREE.DefaultLoadingManager.onLoad = () => setTimeout(bakeEnv, 60);
+setTimeout(bakeEnv, 2500);
 /* =============== labels + network overlay =============== */
 const labels = [];
 BENCH.forEach((b,i)=>{ const d=document.createElement('div'); d.className='lbl'; d.innerHTML=`<em>${i+1}</em>${b.name}`; const l=new CSS2DObject(d); l.position.set(b.cx, 1.66, -0.3); scene.add(l); labels.push(l); });
@@ -1730,7 +1980,7 @@ function frame(){
   uiT += rdt; scrT += rdt;
   if (uiT > 0.2){ uiT=0; updateInfo(); }
   if (scrT > 0.3){ scrT=0; drawScreens(); }
-  renderer.render(scene, camera);
+  renderFrame(inXR);
   if (!inXR) labelR.render(scene, camera);
 }
 document.fonts?.ready.then(()=>{ drawScreens(); doorTex.forEach(f=>f()); });
