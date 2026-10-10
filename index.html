@@ -968,7 +968,7 @@ const room = new THREE.Group(); scene.add(room);
   };
   // alunos voltados para a lousa (+z); professor de frente para a turma
   [-1.3, 0.5, 2.3].forEach((z,i)=>{ workstation(-3.9, z, Math.PI, SCREENS[i%3]); workstation(4.0, z, Math.PI, SCREENS[(i+1)%3]); });
-  workstation(-1.6, 3.7, 0, SCREENS[2], { w:1.5, d:0.75, teacher:true });
+  workstation(-1.6, 3.3, 0, SCREENS[2], { w:1.5, d:0.75, teacher:true });          // cadeira a ~0,3 m da parede da lousa (z = 4,6 m)
   // lousa de vidro na parede oposta à divisória da célula
   { const g = new THREE.Group(); g.position.set(0.6, 1.5, ROOM.zf-0.03); g.rotation.y = Math.PI; room.add(g);
     const BWd = 3.0, BHt = 1.2;
@@ -2460,6 +2460,8 @@ room.traverse(o=>{
 
 /* reflexos: o mapa de ambiente passa a ser o próprio laboratório (captura cúbica a partir do centro da célula) */
 function bakeEnv(){
+  // dentro do óculos o renderer usa a câmera XR em qualquer render: a captura sairia distorcida (cena esverdeada); refaz ao sair
+  if (renderer.xr.isPresenting){ bakeEnv.pending = true; return; }
   const hide = [];
   scene.traverse(o=>{ if (o.isCSS2DObject || o.userData.noEnv) { if (o.visible){ hide.push(o); o.visible=false; } } });
   const old = scene.environment;
@@ -2709,11 +2711,33 @@ renderer.domElement.addEventListener('pointerdown', e=>{ downAt=[e.clientX,e.cli
 const compTip = $('compTip');
 let compHL = null, xrComp = null, doorBack = null;
 function infoOf(o){ for (let q=o; q; q=q.parent) if (q.userData && q.userData.info) return { obj:q, info:q.userData.info }; return null; }
-function hideComp(){ compTip.hidden = true; if (compHL){ scene.remove(compHL); compHL.geometry.dispose(); compHL = null; } xrComp = null; }
+function hideComp(){ compTip.hidden = true; if (compHL){ scene.remove(compHL); compHL.geometry.dispose(); compHL = null; } xrComp = null; xrCompCard(null); }
+// no óculos não há cartão em HTML: o nome do componente aparece num cartão 3D ao lado da peça, voltado para quem olha
+let xrCard = null;
+function xrCompCard(obj, info){
+  if (xrCard){ scene.remove(xrCard); xrCard.material.map.dispose(); xrCard.material.dispose(); xrCard = null; }
+  if (!obj) return;
+  const c = document.createElement('canvas'), W = 768, g = c.getContext('2d'); c.width = W; c.height = 360;
+  const words = String(info.desc || '').split(' '), lines = []; let line = '';
+  g.font = '400 28px "IBM Plex Sans", Arial';
+  for (const w of words){ const t = line ? line+' '+w : w; if (g.measureText(t).width > W-64 && line){ lines.push(line); line = w; } else line = t; } if (line) lines.push(line);
+  const H = Math.min(360, 150 + Math.min(5, lines.length)*36); c.height = H;
+  g.fillStyle = 'rgba(14,17,19,.94)'; g.beginPath(); g.roundRect ? g.roundRect(0,0,W,H,22) : g.rect(0,0,W,H); g.fill(); g.fillStyle = '#62d26f'; g.fillRect(0, 0, 10, H);
+  g.fillStyle = '#62d26f'; g.font = '500 24px "IBM Plex Mono", monospace'; g.fillText(String(info.where || '').toUpperCase().slice(0, 44), 32, 46);
+  g.fillStyle = '#ffffff'; g.font = '600 38px "IBM Plex Sans", Arial'; g.fillText(((info.item!=null ? info.item+' · ' : '') + info.name).slice(0, 34), 32, 96);
+  g.fillStyle = '#c9d2d5'; g.font = '400 28px "IBM Plex Sans", Arial'; lines.slice(0,5).forEach((l,k)=>g.fillText(k===4 && lines.length>5 ? l+' …' : l, 32, 142 + k*36));
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  xrCard = new THREE.Sprite(new THREE.SpriteMaterial({ map:t, depthTest:false, transparent:true, toneMapped:false }));
+  xrCard.renderOrder = 30; const sw = 0.34; xrCard.scale.set(sw, sw*H/W, 1);
+  const bb = new THREE.Box3().setFromObject(obj), ctr = bb.getCenter(new THREE.Vector3()), eye = new THREE.Vector3(); camera.getWorldPosition(eye);
+  const toEye = eye.clone().sub(ctr); toEye.y = 0; toEye.normalize();
+  xrCard.position.copy(ctr).addScaledVector(toEye, 0.12); xrCard.position.y = Math.max(bb.max.y, ctr.y) + sw*H/W/2 + 0.03;
+  scene.add(xrCard);
+}
 function showComp(obj, info, ev){
   hideComp();
   compHL = new THREE.BoxHelper(obj, 0x62d26f); compHL.material.depthTest = false; compHL.renderOrder = 5; scene.add(compHL);
-  if (!ev || renderer.xr.isPresenting){ xrComp = info; return; }
+  if (!ev || renderer.xr.isPresenting){ xrComp = info; if (renderer.xr.isPresenting) xrCompCard(obj, info); return; }
   $('ctEye').textContent = info.where; $('ctName').textContent = (info.item!=null ? `${info.item} · ` : '') + info.name; $('ctDesc').textContent = info.desc;
   compTip.hidden = false;
   const r = compTip.getBoundingClientRect(); let x = ev.clientX + 16, y = ev.clientY + 16;
@@ -3481,13 +3505,16 @@ const ctrls = [0,1].map(i=>{
   const st = { c, line, hit:null, floor:null, handedness:'', idx:i };
   c.addEventListener('connected', e=>{ st.handedness = e.data.handedness; st.gamepad = e.data.gamepad; line.visible = !e.data.hand || true; });
   c.addEventListener('disconnected', ()=>{ st.gamepad = null; });
+  // o alvo é o do momento em que o gatilho (ou a pinça) foi apertado: ao soltar, a mão costuma desviar o raio
+  c.addEventListener('selectstart', ()=>{ st.down = st.hit ? { object:st.hit.object, uv:st.hit.uv?.clone() } : null; });
   c.addEventListener('selectend', ()=>{
+    const hit = st.down || st.hit; st.down = null;
     if (TPX.consumed[i]){ TPX.consumed[i] = false; return; }   // gatilho usado pelo teach pendant (tela, pega, Freedrive)
-    if (st.hit){
-      if (st.hit.object===panel){ if (panelClick(st.hit.uv)) st.gamepad?.hapticActuators?.[0]?.pulse?.(0.3, 30); }
-      else if (st.hit.object===scMesh){ if (scadaClick(st.hit.uv.x*SC.W, (1-st.hit.uv.y)*SC.H)) st.gamepad?.hapticActuators?.[0]?.pulse?.(0.3, 30); }
-      else if (st.hit.object===TPG.mesh){ if (guideClick(st.hit.uv)) st.gamepad?.hapticActuators?.[0]?.pulse?.(0.3, 30); }
-      else { pickObject(st.hit.object); drawPanel(); }
+    if (hit){
+      if (hit.object===panel){ if (panelClick(hit.uv)) st.gamepad?.hapticActuators?.[0]?.pulse?.(0.3, 30); }
+      else if (hit.object===scMesh){ if (scadaClick(hit.uv.x*SC.W, (1-hit.uv.y)*SC.H)) st.gamepad?.hapticActuators?.[0]?.pulse?.(0.3, 30); }
+      else if (hit.object===TPG.mesh){ if (guideClick(hit.uv)) st.gamepad?.hapticActuators?.[0]?.pulse?.(0.3, 30); }
+      else { pickObject(hit.object); drawPanel(); }
     } else if (st.floor){
       // teletransporte mantendo a posição relativa da cabeça
       const head = new THREE.Vector3(); camera.getWorldPosition(head);
@@ -3511,7 +3538,7 @@ function xrUpdate(dt){
     xr.ray.ray.direction.set(0,0,-1).applyMatrix4(xr.m);
     xr.ray.far = 8;
     // o supervisório é desenhado por cima de tudo, então tem prioridade no apontamento
-    const h = (scMesh.visible && xr.ray.intersectObject(scMesh)[0]) || xr.ray.intersectObjects(targets, true)[0];
+    const h = (scMesh.visible && xr.ray.intersectObject(scMesh)[0]) || xr.ray.intersectObjects(targets, true).find(x=>visibleChain(x.object));   // objetos ocultos não bloqueiam o raio
     if (h && h.distance < 6){ st.hit = h; st.line.scale.z = h.distance; }
     else {
       const p = new THREE.Vector3();
@@ -3556,6 +3583,7 @@ renderer.xr.addEventListener('sessionstart', ()=>{
 });
 renderer.xr.addEventListener('sessionend', ()=>{
   xrMode = null; scadaReset(); controls.enabled = true;
+  if (bakeEnv.pending){ bakeEnv.pending = false; setTimeout(bakeEnv, 60); }
   dolly.position.set(0,0,0); dolly.rotation.set(0,0,0);
   camera.position.copy(HOME.pos); controls.target.copy(HOME.tgt); camera.updateProjectionMatrix();
   panel.visible = false; xrLabels.forEach(s=>s.visible=false); labels.forEach(l=>l.visible=$('btnLabels').getAttribute('aria-pressed')==='true');
@@ -4363,9 +4391,9 @@ function psDown(x, y){
   tpDraw(); tpTex.needsUpdate = true;
 }
 function psMove(x, y){ PS.cursor = { x, y }; if (PS.press?.drag) PS.press.drag(x, y); }
-function psUp(x, y){
+function psUp(x, y, lenient=false){                                    // lenient: no óculos vale o botão apertado, mesmo que o raio desvie ao soltar
   const p = PS.press; PS.press = null;
-  if (p && !p.hold && !p.drag && !p.dis){ const b = hitBtn(x, y); if (b && b.key===p.key) p.fn?.(); }
+  if (p && !p.hold && !p.drag && !p.dis){ const b = lenient ? p : hitBtn(x, y); if (b && b.key===p.key) p.fn?.(); }
   tpDraw(); tpTex.needsUpdate = true;
 }
 
@@ -4762,9 +4790,9 @@ function xrSel(i, down){
     let act = null;
     if (TP.holdBy===i){ act = 'free'; TP.freeHold = true; if (!freeOn()) canMove(); }
     else if (st.hit?.object===TPM.scr){ const u = st.hit.uv; psDown(u.x*PS.W, (1-u.y)*PS.H); TPX.pressBy = i; act = 'screen'; }
-    else if (st.hit && isUnder(st.hit.object, TPM.pend) && !st.hit.object.userData.estop){ tpGrab(i); act = 'grab'; }
+    else if (TP.holdBy<0 && st.hit && isUnder(st.hit.object, TPM.pend) && !st.hit.object.userData.estop){ tpGrab(i); act = 'grab'; }   // na mão de alguém, mirar a moldura não troca o pendant de mão
     else if (TPX.isHand[i]){
-      if (nearPendant(i)){ tpGrab(i); act = 'grab'; }
+      if (TP.holdBy<0 && nearPendant(i)){ tpGrab(i); act = 'grab'; }
       else if (nearTrain(i)){ carryStart(i); act = 'carry'; }
       else if (freeOn() && nearTool(i)){ dragStart(i); act = 'drag'; }
     }
@@ -4772,7 +4800,7 @@ function xrSel(i, down){
   } else {
     const act = TPX.selAct[i]; TPX.selAct[i] = null;
     if (act==='free') TP.freeHold = false;
-    if (act==='screen'){ psUp(PS.cursor?.x ?? -1, PS.cursor?.y ?? -1); TPX.pressBy = -1; }
+    if (act==='screen'){ psUp(PS.cursor?.x ?? -1, PS.cursor?.y ?? -1, true); TPX.pressBy = -1; }
     if (act==='carry') carryEnd();
     if (act==='drag'){ TPX.drag = null; TPX.freeStart = null; }
   }
@@ -4781,7 +4809,7 @@ function xrSqz(i, down){
   const st = ctrls[i];
   if (down){
     if (TP.holdBy===i){ tpRelease(); return; }
-    if (nearPendant(i) || (st.hit && isUnder(st.hit.object, TPM.pend))){ tpGrab(i); return; }
+    if (nearPendant(i) || (TP.holdBy<0 && st.hit && isUnder(st.hit.object, TPM.pend))){ tpGrab(i); return; }
     if (nearTrain(i) || (st.hit && TP.train && isUnder(st.hit.object, TP.train.g))){ carryStart(i); TPX.sqAct[i] = 'carry'; return; }
     if (nearTool(i) || onRobot(st.hit)){
       if (freeOn()){ dragStart(i); TPX.sqAct[i] = 'drag'; }
@@ -4804,7 +4832,7 @@ function tpXR(dt){
   // raio da outra mão sobre a tela
   for (const [i, st] of ctrls.entries()){
     if (i===TP.holdBy) continue;
-    if (st.hit?.object===TPM.scr){ const u = st.hit.uv; PS.cursor = { x:u.x*PS.W, y:(1-u.y)*PS.H }; if (TPX.pressBy===i) psMove(PS.cursor.x, PS.cursor.y); }
+    if (st.hit?.object===TPM.scr){ const u = st.hit.uv; PS.cursor = { x:u.x*PS.W, y:(1-u.y)*PS.H }; TPX.hoverT = 1; if (TPX.pressBy===i) psMove(PS.cursor.x, PS.cursor.y); }
   }
   // toque com a ponta do indicador (rastreamento de mãos)
   for (let i=0;i<2;i++){
@@ -4812,9 +4840,9 @@ function tpXR(dt){
     const tip = hands[i].joints?.['index-finger-tip']; if (!tip) continue;
     const lp = TPM.scr.worldToLocal(tip.getWorldPosition(V3())), inside = Math.abs(lp.x) < 0.128 && Math.abs(lp.y) < 0.08;
     const x = (lp.x/0.256 + 0.5)*PS.W, y = (0.5 - lp.y/0.16)*PS.H;
-    if (inside && lp.z < 0.05) PS.cursor = { x, y };
+    if (inside && lp.z < 0.05){ PS.cursor = { x, y }; TPX.hoverT = 1; }
     if (!TPX.poke[i] && inside && lp.z < 0.005 && lp.z > -0.03 && TPX.pressBy<0){ TPX.poke[i] = true; TPX.pressBy = i; psDown(x, y); }
-    else if (TPX.poke[i]){ if (lp.z > 0.012 || !inside){ TPX.poke[i] = false; TPX.pressBy = -1; psUp(x, y); } else psMove(x, y); }
+    else if (TPX.poke[i]){ if (lp.z > 0.012 || !inside){ TPX.poke[i] = false; TPX.pressBy = -1; psUp(x, y, true); } else psMove(x, y); }
   }
   // Freedrive: o TCP segue a mão que segura a ferramenta
   if (TPX.drag){
@@ -4823,7 +4851,7 @@ function tpXR(dt){
       const W = new THREE.Matrix4().multiplyMatrices(gr.matrixWorld, TPX.drag.off); freeTo(new THREE.Matrix4().copy(UR3.base.matrixWorld).invert().multiply(W)); }
   }
 }
-renderer.xr.addEventListener('sessionend', ()=>{ tpRelease(); TPX.drag = null; carryEnd(); TPX.pressBy = -1; PS.cursor = null; TP.freeHold = false; });
+renderer.xr.addEventListener('sessionend', ()=>{ hideComp(); tpRelease(); TPX.drag = null; carryEnd(); TPX.pressBy = -1; PS.cursor = null; TP.freeHold = false; });
 renderer.xr.addEventListener('sessionstart', ()=>{ if (TP.open) closeTP(); });
 
 // painel do roteiro no óculos, ao lado do robô
@@ -4904,7 +4932,8 @@ function tpTick(dt){
   pendantAnim(dt);
   lessonCheck();
   PS.toastT -= dt; PS.t += dt;
-  const xrOn = renderer.xr.isPresenting, fast = TP.open || TP.holdBy>=0 || !!PS.press || TPX.pressBy>=0;
+  TPX.hoverT = Math.max(0, (TPX.hoverT||0) - dt);
+  const xrOn = renderer.xr.isPresenting, fast = TP.open || TP.holdBy>=0 || !!PS.press || TPX.pressBy>=0 || TPX.hoverT > 0;
   if (PS.t > (fast ? (xrOn ? 1/12 : 1/15) : 0.5)){ PS.t = 0; tpDraw(); tpTex.needsUpdate = true; if (xrOn && TPG.dirty) guideDraw(); }   // a textura de 1280 × 800 sobe para a GPU no máximo 12×/s no óculos
   TPG.mesh.visible = xrOn && (TP.local || TP.holdBy>=0);
 }
