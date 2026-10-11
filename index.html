@@ -3501,7 +3501,7 @@ const ctrls = [0,1].map(i=>{
   const c = renderer.xr.getController(i); dolly.add(c);
   const line = new THREE.Line(rayGeo, new THREE.LineBasicMaterial({ color:0x62d26f, transparent:true, opacity:.8 })); line.scale.z = 3; c.add(line);
   const grip = renderer.xr.getControllerGrip(i); grip.add(ctrlFactory.createControllerModel(grip)); dolly.add(grip);
-  const hand = renderer.xr.getHand(i); hand.add(handFactory.createHandModel(hand, 'spheres')); dolly.add(hand);
+  const hand = renderer.xr.getHand(i); hand.userData.model = handFactory.createHandModel(hand, 'mesh'); hand.add(hand.userData.model); dolly.add(hand);   // malha articulada (material de pele no módulo do pendant)
   const st = { c, line, hit:null, floor:null, handedness:'', idx:i };
   c.addEventListener('connected', e=>{ st.handedness = e.data.handedness; st.gamepad = e.data.gamepad; line.visible = !e.data.hand || true; });
   c.addEventListener('disconnected', ()=>{ st.gamepad = null; });
@@ -4070,7 +4070,7 @@ function drawMove(){
 function drawFreePanel(){
   fillR(330, 206, 448, 132, 'rgba(255,255,255,.95)', 6); strokeR(330, 206, 448, 132, PC.blue, 2, 6);
   txt('Freedrive', 346, 232, 17, PC.blueD, { w:700 });
-  txt(renderer.xr.isPresenting ? tt('Segure o gatilho da mão do pendant e puxe a ferramenta com a outra mão (botão de pega).','Hold the trigger of the pendant hand and pull the tool with the other hand (grip button).') : tt('Arraste a ferramenta do robô com o mouse na cena 3D.','Drag the robot tool with the mouse in the 3D view.'), 346, 254, 13, PC.mut, { max:420 });
+  txt(renderer.xr.isPresenting ? tt('Segure o gatilho esquerdo (mão do pendant) e puxe a ferramenta com a mão direita (botão de pega).','Hold the left trigger (pendant hand) and pull the tool with the right hand (grip button).') : tt('Arraste a ferramenta do robô com o mouse na cena 3D.','Drag the robot tool with the mouse in the 3D view.'), 346, 254, 13, PC.mut, { max:420 });
   [['all',tt('Todos livres','All free')],['plane',tt('Plano','Plane')],['trans',tt('Transladar','Translate')],['rot',tt('Rotação','Rotate')]].forEach(([k,t],i)=>btn('fm:'+k, 342+i*108, 274, 102, 50, t, { on:TP.freeMode===k, fs:14, fn:()=>{ TP.freeMode = k; } }));
 }
 function drawRun(){
@@ -4321,10 +4321,11 @@ function drawModal(){
   g.fillStyle = 'rgba(20,26,30,.45)'; g.fillRect(0, 0, PS.W, PS.H);
   if (m.type==='menu'){
     PS.btn.push({ key:'menu:bg', x:0, y:0, w:PS.W, h:PS.H, fn:()=>{ TP.modal = null; } });
-    fillR(990, 70, 280, 290, '#2d3236', 6);
+    fillR(990, 70, 280, TP.holdBy>=0 ? 358 : 290, '#2d3236', 6);
     [[tt('Ajuda','Help'),()=>msgBox(tt('Ajuda','Help'), tt('Teach pendant do UR3e (PolyScope simulado). Executar roda programas, Programa cria a árvore, Instalação configura TCP e carga útil, Mover faz o jog e o Freedrive, E/S mostra os sinais e Registro mostra o estado das juntas. Siga o roteiro de aprendizagem ao lado do pendant.','UR3e teach pendant (simulated PolyScope). Follow the learning guide next to the pendant.'))],
      [tt('Sobre','About'),()=>msgBox(tt('Sobre','About'), 'PolyScope 5 (simulado) · UR3e · Gêmeo digital Smart 4.0 · UniSENAI')],
      [`${tt('Idioma','Language')}: ${TP.lang==='pt' ? 'Português' : 'English'}`,()=>{ TP.lang = TP.lang==='pt' ? 'en' : 'pt'; guideRender(); TP.modal = null; }],
+     ...(TP.holdBy>=0 ? [[tt('Guardar pendant no suporte','Return pendant to holder'), tpRelease]] : []),
      [tt('Desligar robô','Shutdown Robot'),()=>{ if (!TP.local) return msgBox(tt('Controle remoto','Remote control'), tt('Assuma o controle local para desligar o robô.','Take local control to power off the robot.')); robotOff(tt('Robô desligado pelo menu','Robot powered off from the menu')); TP.modal = null; }]]
       .forEach(([t,fn],i)=>{ const y = 82 + i*68; btn('mi:'+i, 1000, y, 260, 60, t, { fill:'#3b4247', ink:'#fff', noStroke:true, fs:17, fn:()=>{ TP.modal = null; fn(); } }); });
     return;
@@ -4661,7 +4662,7 @@ const LESSONS = [
       { t:'Em <b>Recurso</b> (Feature), escolha <b>Ferramenta</b>: agora as setas seguem os eixos da garra.', hl:'feat:tool', ok:()=>TP.feature==='tool' },
       { t:'Segure uma seta de <b>Orientação do TCP</b> e gire a ferramenta 10° em torno do TCP.', hl:'jr:*', ok:()=>dS('rot') >= 0.17 },
       { t:'Em <b>Posição das juntas</b>, segure − ou + de uma junta até girar 15°.', hl:'jj:*', ok:()=>dS('joint') >= 0.26 },
-      { t:'Freedrive: no óculos, segure o <b>gatilho da mão que segura o pendant</b> (botão traseiro) e puxe a ferramenta com a outra mão (botão de pega). No computador, toque em <b>Freedrive</b> e arraste a ferramenta na cena. Conduza 5 cm.', hl:'free', ok:()=>dS('free') >= 0.05 },
+      { t:'Freedrive: no óculos, segure o <b>gatilho da mão esquerda</b>, que segura o pendant (botão traseiro), e puxe a ferramenta com a mão direita (botão de pega). No computador, toque em <b>Freedrive</b> e arraste a ferramenta na cena. Conduza 5 cm.', hl:'free', ok:()=>dS('free') >= 0.05 },
       { t:'Toque em <b>Início</b> (Home) e segure <b>Automático</b> até o braço chegar à posição vertical.', hl:['home','auto'], ok:()=>dS('home') >= 1 },
     ] },
   { title:'3 · Instalação: TCP, carga útil e Home', ref:'Guia XL4002 p. 280–282',
@@ -4765,32 +4766,47 @@ $('tpEstop').onclick = triggerEstop;
 $('tpFree').onclick = ()=>{ if (!canMove()) return; TP.free = !TP.free; tplog(TP.free ? 'Freedrive ligado' : 'Freedrive desligado'); };
 addEventListener('keydown', e=>{ if (e.key==='Escape' && TP.open && !SC.open && !TP.modal) closeTP(); });
 
-/* ---------- óculos: pegar o pendant com uma das mãos, tocar a tela, Freedrive e peça de treino ---------- */
+/* ---------- óculos: o pendant fica preso à mão esquerda; a direita toca a tela, conduz o robô em Freedrive e pega a peça ---------- */
 const grips = [0,1].map(i=>renderer.xr.getControllerGrip(i)), hands = [0,1].map(i=>renderer.xr.getHand(i));
 TPX.selAct = [null,null]; TPX.sqAct = [null,null];
-const gripPos = i => { grips[i].updateWorldMatrix(true, false); return V3().setFromMatrixPosition(grips[i].matrixWorld); };
-const nearPendant = i => TP.holdBy!==i && gripPos(i).distanceTo(TPM.pend.getWorldPosition(V3())) < 0.2;
-const nearTrain = i => !!TP.train && gripPos(i).distanceTo(TP.train.g.getWorldPosition(V3()).add(V3(0,BH/2,0))) < 0.12;
-const nearTool = i => gripPos(i).distanceTo(UR3.tool.getWorldPosition(V3())) < 0.18;
+// âncora de cada mão: a pega do controle ou a palma da mão rastreada (no three r160 a pega não é atualizada quando o Quest usa as mãos)
+const palm = i => hands[i].joints?.['middle-finger-metacarpal'] || hands[i].joints?.['wrist'] || null;
+const handObj = i => (TPX.isHand[i] && palm(i)) || grips[i];
+const handPos = i => { const o = handObj(i); o.updateWorldMatrix(true, false); return V3().setFromMatrixPosition(o.matrixWorld); };
+const leftIdx = () => ctrls.findIndex(c=>c.handedness==='left');
+const nearPendant = i => TP.holdBy!==i && handPos(i).distanceTo(TPM.pend.getWorldPosition(V3())) < 0.2;
+const nearTrain = i => !!TP.train && handPos(i).distanceTo(TP.train.g.getWorldPosition(V3()).add(V3(0,BH/2,0))) < 0.12;
+const nearTool = i => handPos(i).distanceTo(UR3.tool.getWorldPosition(V3())) < 0.18;
 const onRobot = h => h && isUnder(h.object, UR3.base);
 function tpGrab(i){
-  if (TP.holdBy===i) return;
-  TP.holdBy = i; TP.freeHold = false; grips[i].attach(TPM.pend);
-  const left = ctrls[i].handedness !== 'right';
-  TPM.target = { p:V3(left ? 0.12 : -0.12, 0.03, -0.07), q:new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.95, 0, 0)) };
-  TPX.grabT = 0; ctrls[i].gamepad?.hapticActuators?.[0]?.pulse?.(0.4, 40); guideRender();
+  const h = leftIdx() >= 0 ? leftIdx() : i;                          // qualquer mão seleciona; o pendant vai sempre para a esquerda
+  if (TP.holdBy===h) return;
+  TP.holdBy = h; TP.freeHold = false; scene.attach(TPM.pend); TPX.grabT = 0;
+  TPM.target = { p:TPM.pend.position.clone(), q:TPM.pend.quaternion.clone() };
+  ctrls[h].gamepad?.hapticActuators?.[0]?.pulse?.(0.4, 40); guideRender();
+  tpToast(tt('Pendant na mão esquerda: toque a tela com a direita (raio ou dedo). Gatilho ou pinça da esquerda = Freedrive.','Pendant on the left hand: touch the screen with the right (ray or finger). Left trigger or pinch = Freedrive.'));
 }
 function tpRelease(){ if (TP.holdBy<0) return; TPM.dock.attach(TPM.pend); TPM.target = { p:TPM.hook.position.clone(), q:TPM.hook.quaternion.clone() }; TP.holdBy = -1; TP.freeHold = false; TPG.dirty = true; }
-function carryStart(i){ const b = TP.train; if (!b) return; if (TP.grasped===b) TP.grasped = null; grips[i].attach(b.g); TPX.carry = { i }; }
+// pose do pendant na mão: logo acima da palma, deslocado para o centro do corpo e com a tela voltada para o rosto
+const _held = new THREE.Object3D();
+function heldPose(){
+  const hp = handPos(TP.holdBy), head = camera.getWorldPosition(V3());
+  const fwd = hp.clone().sub(head); fwd.y = 0; if (fwd.lengthSq() < 1e-6) fwd.set(0,0,-1); fwd.normalize();
+  const side = ctrls[TP.holdBy].handedness==='right' ? -1 : 1;
+  _held.position.copy(hp).addScaledVector(V3(-fwd.z, 0, fwd.x), side*0.12).add(V3(0, 0.08, 0)).addScaledVector(fwd, 0.03);
+  _held.lookAt(head);
+  TPM.target = { p:_held.position.clone(), q:_held.quaternion.clone() };
+}
+function carryStart(i){ const b = TP.train; if (!b) return; if (TP.grasped===b) TP.grasped = null; handObj(i).attach(b.g); TPX.carry = { i }; }
 function carryEnd(){ if (!TPX.carry) return; TPX.carry = null; if (TP.train) dropPart(TP.train); }
-function dragStart(i){ grips[i].updateWorldMatrix(true, false); UR3.base.updateWorldMatrix(true, false); const T = new THREE.Matrix4().multiplyMatrices(UR3.base.matrixWorld, tcpPose()); TPX.drag = { i, off:grips[i].matrixWorld.clone().invert().multiply(T) }; TPX.freeStart = tcpPose(); }
+function dragStart(i){ const o = handObj(i); o.updateWorldMatrix(true, false); UR3.base.updateWorldMatrix(true, false); const T = new THREE.Matrix4().multiplyMatrices(UR3.base.matrixWorld, tcpPose()); TPX.drag = { i, off:o.matrixWorld.clone().invert().multiply(T) }; TPX.freeStart = tcpPose(); }
 function xrSel(i, down){
   const st = ctrls[i];
   if (down){
     let act = null;
     if (TP.holdBy===i){ act = 'free'; TP.freeHold = true; if (!freeOn()) canMove(); }
     else if (st.hit?.object===TPM.scr){ const u = st.hit.uv; psDown(u.x*PS.W, (1-u.y)*PS.H); TPX.pressBy = i; act = 'screen'; }
-    else if (TP.holdBy<0 && st.hit && isUnder(st.hit.object, TPM.pend) && !st.hit.object.userData.estop){ tpGrab(i); act = 'grab'; }   // na mão de alguém, mirar a moldura não troca o pendant de mão
+    else if (TP.holdBy<0 && st.hit && isUnder(st.hit.object, TPM.pend) && !st.hit.object.userData.estop){ tpGrab(i); act = 'grab'; }
     else if (TPX.isHand[i]){
       if (TP.holdBy<0 && nearPendant(i)){ tpGrab(i); act = 'grab'; }
       else if (nearTrain(i)){ carryStart(i); act = 'carry'; }
@@ -4808,12 +4824,12 @@ function xrSel(i, down){
 function xrSqz(i, down){
   const st = ctrls[i];
   if (down){
-    if (TP.holdBy===i){ tpRelease(); return; }
-    if (nearPendant(i) || (TP.holdBy<0 && st.hit && isUnder(st.hit.object, TPM.pend))){ tpGrab(i); return; }
+    if (TP.holdBy===i){ tpToast(tt('Para guardar o pendant, encoste-o no suporte da bancada ou use Devolver pendant.','To store the pendant, touch it to the bench holder or use Return pendant.')); return; }
+    if (TP.holdBy<0 && (nearPendant(i) || (st.hit && isUnder(st.hit.object, TPM.pend)))){ tpGrab(i); return; }
     if (nearTrain(i) || (st.hit && TP.train && isUnder(st.hit.object, TP.train.g))){ carryStart(i); TPX.sqAct[i] = 'carry'; return; }
     if (nearTool(i) || onRobot(st.hit)){
       if (freeOn()){ dragStart(i); TPX.sqAct[i] = 'drag'; }
-      else tpToast(tt('Freedrive desligado: segure o gatilho da mão que segura o pendant (botão traseiro)','Freedrive off: hold the trigger of the hand holding the pendant (back button)'));
+      else tpToast(tt('Freedrive desligado: segure o gatilho da mão esquerda (botão traseiro do pendant)','Freedrive off: hold the left trigger (pendant back button)'));
     }
   } else {
     const a = TPX.sqAct[i]; TPX.sqAct[i] = null;
@@ -4821,14 +4837,30 @@ function xrSqz(i, down){
   }
 }
 ctrls.forEach((st, i)=>{
-  st.c.addEventListener('connected', e=>{ TPX.isHand[i] = !!e.data.hand; });
+  st.c.addEventListener('connected', e=>{ TPX.isHand[i] = !!e.data.hand; TPX.handT[i] = 0; });
   st.c.addEventListener('selectstart', ()=>xrSel(i, true)); st.c.addEventListener('selectend', ()=>xrSel(i, false));
   st.c.addEventListener('squeezestart', ()=>xrSqz(i, true)); st.c.addEventListener('squeezeend', ()=>xrSqz(i, false));
 });
+// mãos: malha articulada do perfil genérico do WebXR com material de pele; sem a malha (sem internet), volta às esferas
+TPX.handT = [0,0];
+const SKIN = new THREE.MeshPhysicalMaterial({ color:0xc8957a, roughness:.55, metalness:0, sheen:.5, sheenColor:0xffd9c9, sheenRoughness:.55, clearcoat:.08, clearcoatRoughness:.6 });
+function handSkin(dt){
+  for (let i=0;i<2;i++){
+    const h = hands[i], m = h.userData.model; if (!TPX.isHand[i] || !m || h.userData.skinned) continue;
+    let sk = null; m.traverse(o=>{ if (o.isSkinnedMesh) sk = o; });
+    if (sk){ sk.material = SKIN; h.userData.skinned = true; continue; }
+    TPX.handT[i] += dt;
+    if (TPX.handT[i] > 8 && !h.userData.fallback){ h.userData.fallback = true; h.add(handFactory.createHandModel(h, 'spheres')); }
+  }
+}
 function tpXR(dt){
   TPX.grabT += dt;
-  // devolver o pendant ao suporte: aproximar do gancho na frente da bancada
-  if (TP.holdBy>=0 && TPX.grabT > 1.2 && TPM.pend.getWorldPosition(V3()).distanceTo(TPM.hook.getWorldPosition(V3())) < 0.14) tpRelease();
+  handSkin(dt);
+  if (TP.holdBy>=0){
+    heldPose();
+    // devolver o pendant ao suporte: encostá-lo no gancho na frente da bancada
+    if (TPX.grabT > 1.5 && TPM.pend.getWorldPosition(V3()).distanceTo(TPM.hook.getWorldPosition(V3())) < 0.14) tpRelease();
+  }
   // raio da outra mão sobre a tela
   for (const [i, st] of ctrls.entries()){
     if (i===TP.holdBy) continue;
@@ -4847,7 +4879,7 @@ function tpXR(dt){
   // Freedrive: o TCP segue a mão que segura a ferramenta
   if (TPX.drag){
     if (!freeOn()){ TPX.drag = null; }
-    else { const gr = grips[TPX.drag.i]; gr.updateWorldMatrix(true, false); UR3.base.updateWorldMatrix(true, false);
+    else { const gr = handObj(TPX.drag.i); gr.updateWorldMatrix(true, false); UR3.base.updateWorldMatrix(true, false);
       const W = new THREE.Matrix4().multiplyMatrices(gr.matrixWorld, TPX.drag.off); freeTo(new THREE.Matrix4().copy(UR3.base.matrixWorld).invert().multiply(W)); }
   }
 }
@@ -4903,7 +4935,7 @@ function guideClick(uv){
 
 /* ---------- laço do pendant ---------- */
 function pendantAnim(dt){
-  const t = TPM.target, p = TPM.pend, k = 1 - Math.exp(-dt*14);
+  const t = TPM.target, p = TPM.pend, k = 1 - Math.exp(-dt*(TP.holdBy>=0 ? 22 : 14));
   p.position.lerp(t.p, k); p.quaternion.slerp(t.q, k);
   const moving = TP.holdBy>=0 || p.position.distanceToSquared(t.p) > 1e-8;
   if (moving || TPM.cableT > 0){ tpCable(); TPM.cableT = moving ? 0.4 : TPM.cableT - dt; }

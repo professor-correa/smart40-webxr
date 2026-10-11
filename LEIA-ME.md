@@ -58,6 +58,8 @@ Dica: antes de entrar, defina o limite (Guardian) com espaço livre de cerca de 
 | Girar 30° | Manche direito para os lados | — |
 | Sair | Botão Meta | Gesto do menu do sistema |
 
+Com o rastreamento de mãos, as mãos aparecem como uma malha articulada com tom de pele (modelo genérico do WebXR, baixado da internet na primeira vez). Sem internet, voltam a ser esferas nas articulações.
+
 O **painel flutuante** fica à esquerda da bancada e mostra os indicadores, o estado da bancada selecionada, os sinais de E/S do CLP (ou a tag RFID do bloco) e os botões de operação.
 
 ### Fazer um pedido na loja (dentro do óculos)
@@ -128,16 +130,16 @@ O robô da Montagem tem um teach pendant UR e-Series com a interface PolyScope s
 
 **Abrir**
 - **No computador:** clique no pendant na bancada ou no botão **Teach pendant** da barra inferior. O pendant abre ao lado da cena, com o robô à vista à esquerda e o roteiro de aprendizagem no alto. **Devolver ao suporte** ou Esc fecha.
-- **No óculos:** aproxime a mão do pendant e aperte o **botão de pega** (ou aponte para ele e aperte o gatilho). O pendant fica preso nessa mão, como um tablet.
+- **No óculos:** aproxime qualquer mão do pendant e aperte o **botão de pega** (ou aponte para ele e aperte o gatilho). O pendant fica preso à **mão esquerda**, logo acima da palma e com a tela voltada para o seu rosto; a mão direita toca a tela.
 
 | Ação no óculos | Controles Touch Plus | Mãos (hand tracking) |
 |---|---|---|
-| Pegar o pendant | Botão de pega perto dele, ou raio + gatilho | Pinça perto do pendant |
-| Tocar a tela | Raio da outra mão + gatilho | Encostar a ponta do indicador na tela |
-| Freedrive (botão traseiro) | Segurar o **gatilho da mão que segura o pendant** | Pinça da mão que segura o pendant, ou botão Freedrive da tela |
-| Conduzir o robô em Freedrive | Com o Freedrive ativo, botão de pega da outra mão perto da ferramenta e mover a mão | Pinça perto da ferramenta e mover a mão |
+| Pegar o pendant (vai para a mão esquerda) | Botão de pega perto dele, ou raio + gatilho | Pinça perto do pendant |
+| Tocar a tela | Raio da mão direita + gatilho | Encostar a ponta do indicador direito na tela |
+| Freedrive (botão traseiro) | Segurar o **gatilho esquerdo** | Pinça da mão esquerda, ou botão Freedrive da tela |
+| Conduzir o robô em Freedrive | Com o Freedrive ativo, botão de pega da mão direita perto da ferramenta e mover a mão | Pinça da direita perto da ferramenta e mover a mão |
 | Pegar a peça de treino com a mão | Botão de pega perto do bloco azul | Pinça perto do bloco |
-| Guardar o pendant | Botão de pega de novo, ou encostar o pendant no suporte | Encostar o pendant no suporte, ou **Devolver pendant** no painel do roteiro |
+| Guardar o pendant | Encostar o pendant no suporte, **Devolver pendant** no painel do roteiro ou menu ☰ → Guardar pendant no suporte | Igual |
 
 **Telas do PolyScope**
 - **Cabeçalho:** abas Executar, Programa, Instalação, Mover, E/S e Registro; programa e instalação ativos; Novo, Abrir e Salvar; modo **Remoto/Local**; soma de verificação de segurança; menu (Ajuda, Sobre, **idioma português/inglês** e Desligar robô).
