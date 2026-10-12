@@ -342,7 +342,6 @@ const M = {
 };
 const BLOCK_COL = { vermelho:0xc8372f, azul:0x2f6fc4, preto:0x1f2124 };
 const LAM_COL = { azul:0x1f5fd6, vermelho:0xd32f2f, branco:0xf2f2f2, preto:0x121314, amarelo:0xf4c20d, verde:0x3c8b3c };
-const MODELS = ['casa','barco','estrela'];
 const BLOCK_MAT = Object.fromEntries(Object.entries(BLOCK_COL).map(([k,c])=>[k,std(c,{roughness:.4,metalness:.05})]));
 const hex = c => '#'+c.toString(16).padStart(6,'0');
 const cap = s => s.charAt(0).toUpperCase()+s.slice(1);
@@ -539,9 +538,9 @@ function coactEGH(){
   }
   // anel de LED de status
   const dots = cv(512,16,(c,w,h)=>{ c.fillStyle='#000'; c.fillRect(0,0,w,h); c.fillStyle='#fff'; for(let x=6;x<w;x+=16){ c.fillRect(x,3,10,10); } });
-  dots.wrapS = THREE.RepeatWrapping; dots.repeat.set(1,1);
+  dots.wrapS = THREE.RepeatWrapping; dots.repeat.set(2,1);
   const ledMat = new THREE.MeshStandardMaterial({ color:0x2a3324, roughness:.3, emissive:0x8ee03a, emissiveMap:dots, emissiveIntensity:2.2 });
-  rbox(0.0836,0.0055,0.0776,0.0026,ledMat,0,-0.0365,0,g);
+  { const led = new THREE.Mesh(new THREE.CylinderGeometry(0.0428,0.0428,0.0055,72,1,true), ledMat); led.position.y = -0.0365; g.add(led); }   // faixa redonda em volta do corpo (Ø 85,6 mm)
   // corpo branco (perfil frontal alargando para baixo, cantos arredondados)
   const sh = new THREE.Shape();
   const T=-0.044, B=-0.092;
@@ -779,21 +778,37 @@ function ur3e(){
     yaw.rotation.y = 0; p2.rotation.z = Math.PI/2; el.rotation.z = 0; w1.rotation.z = 0; w3.rotation.x = -Math.PI/2; tool.rotation.y = 0;
     base.updateMatrixWorld(true); gltf.scene.updateMatrixWorld(true);
     const groupOf = { base, elo1:yaw, elo2:p2, elo3:el, elo4:w1, elo5:w3, flange:tool };
+    // cores e acabamento pelas fotos do UR3e: carcaças cinza acetinado, tubos e base de alumínio escovado, tampas azul-claro, anéis pretos
     const MAT = {
-      corpo:   new THREE.MeshPhysicalMaterial({ color:0x6f7377, roughness:.42, metalness:.35, clearcoat:.25, clearcoatRoughness:.4 }),   // carcaças das juntas
-      tubo:    new THREE.MeshPhysicalMaterial({ color:0xe6e8ea, roughness:.3, metalness:.05, clearcoat:.35, clearcoatRoughness:.3 }),    // tubos de alumínio anodizado claro
-      tampa:   new THREE.MeshPhysicalMaterial({ color:0x2fb3e8, roughness:.32, metalness:0, clearcoat:.55, clearcoatRoughness:.25 }),     // tampas ciano
-      vedacao: std(0x141517,{roughness:.6,metalness:0}),
+      corpo:   new THREE.MeshPhysicalMaterial({ color:0x80858a, roughness:.48, metalness:.3, clearcoat:.2, clearcoatRoughness:.4 }),
+      tubo:    new THREE.MeshPhysicalMaterial({ color:0xd8dbde, roughness:.26, metalness:.85, clearcoat:.15, clearcoatRoughness:.3 }),
+      tampa:   new THREE.MeshPhysicalMaterial({ color:0x6f9cce, roughness:.45, metalness:0, clearcoat:.35, clearcoatRoughness:.35 }),
+      vedacao: std(0x111214,{roughness:.55,metalness:0}),
       escuro:  std(0x2a2d31,{roughness:.5,metalness:.2}),
-      metal:   std(0xc4c8cc,{roughness:.25,metalness:.9}),
-      base:    new THREE.MeshPhysicalMaterial({ color:0xb3b9cf, roughness:.38, metalness:.2, clearcoat:.25, clearcoatRoughness:.4 }),   // base cinza-azulada
+      metal:   std(0xc9cdd1,{roughness:.22,metalness:.9}),
+      base:    new THREE.MeshPhysicalMaterial({ color:0xc6cace, roughness:.42, metalness:.6, clearcoat:.15, clearcoatRoughness:.3 }),
     };
     const toLocal = new THREE.Matrix4();
+    // a conversão do STEP marcou como "tampa" faixas soltas na borda das carcaças: pedaços com menos de 15 % da tampa voltam à cor da carcaça
+    function splitCap(geo){
+      const g = geo.index ? geo.toNonIndexed() : geo, pos = g.attributes.position, nor = g.attributes.normal, nt = pos.count/3;
+      const key = i => `${pos.getX(i).toFixed(5)},${pos.getY(i).toFixed(5)},${pos.getZ(i).toFixed(5)}`, par = new Map();
+      const find = a => { while (par.get(a)!==a){ par.set(a, par.get(par.get(a))); a = par.get(a); } return a; };
+      const id = i => { const k = key(i); if (!par.has(k)) par.set(k, k); return k; };
+      for (let f=0; f<nt; f++){ const a = find(id(3*f)); par.set(find(id(3*f+1)), a); par.set(find(id(3*f+2)), a); }
+      const root = [], cnt = new Map(); for (let f=0; f<nt; f++){ const r = find(key(3*f)); root.push(r); cnt.set(r, (cnt.get(r)||0)+1); }
+      const mx = Math.max(...cnt.values()), A = { p:[], n:[] }, B = { p:[], n:[] };
+      for (let f=0; f<nt; f++){ const dst = cnt.get(root[f]) < 0.15*mx ? B : A; for (let v=0; v<3; v++){ const k = 3*f+v; dst.p.push(pos.getX(k), pos.getY(k), pos.getZ(k)); dst.n.push(nor.getX(k), nor.getY(k), nor.getZ(k)); } }
+      const mk = d => { const o = new THREE.BufferGeometry(); o.setAttribute('position', new THREE.Float32BufferAttribute(d.p, 3)); o.setAttribute('normal', new THREE.Float32BufferAttribute(d.n, 3)); return o; };   // normais originais do CAD
+      return [mk(A), B.p.length ? mk(B) : null];
+    }
+    const addCAD = (geo, mat, grp) => { const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = mesh.receiveShadow = true; mesh.userData.cad = true; grp.add(mesh); };
     gltf.scene.traverse(m=>{
       if (!m.isMesh) return; const [lk, mk] = m.name.split('_'), grp = groupOf[lk]; if (!grp) return;
       toLocal.copy(grp.matrixWorld).invert().multiply(base.matrixWorld).multiply(m.matrixWorld);
-      const mesh = new THREE.Mesh(m.geometry.clone().applyMatrix4(toLocal), lk==='base' && mk==='corpo' ? MAT.base : (MAT[mk] || MAT.corpo));
-      mesh.castShadow = mesh.receiveShadow = true; mesh.userData.cad = true; grp.add(mesh);
+      const geo = m.geometry.clone().applyMatrix4(toLocal);
+      if (mk==='tampa'){ const [cap, rest] = splitCap(geo); addCAD(cap, MAT.tampa, grp); if (rest) addCAD(rest, MAT.corpo, grp); return; }
+      addCAD(geo, lk==='base' && mk==='corpo' ? MAT.base : (MAT[mk] || MAT.corpo), grp);
     });
     procMeshes.forEach(m=>{ m.visible = false; });
     [yaw.rotation.y, p2.rotation.z, el.rotation.z, w1.rotation.z, w3.rotation.x, tool.rotation.y] = saved;
@@ -1516,7 +1531,7 @@ for (const b of BENCH){                                   // conexão elétrica 
   for (const dx of [-0.03,0,0.03]){ const c = cyl(0.007,0.007,0.016,M.aluDark,x+dx,BELT_Y-0.06,z+0.022,scene,12); c.rotation.x = Math.PI/2; }
 }
 
-/* =============== Smart Block (bloco com ranhuras, pinos de empilhamento), lâminas com desenhos, tampa =============== */
+/* =============== Smart Block (bloco com ranhuras, pinos de empilhamento), lâminas coloridas, tampa =============== */
 const BW = 0.06, BH = 0.034, BT = 0.004, TAMPA_H = 0.01;
 const LAM_H = 0.024, LAM_W = 0.046, LAM_T = 0.0016;
 const blockGeo = (()=>{
@@ -1536,34 +1551,19 @@ const tampaGeo = new RoundedBoxGeometry(BW+0.002, TAMPA_H, BW+0.002, 2, 0.003);
 const lamGeo = new THREE.BoxGeometry(LAM_T, LAM_H, LAM_W);      // plane faces ±x
 const WALL = [ { name:'esquerda', x:-BW/2+BT/2, z:0, ry:0 }, { name:'frontal', x:0, z:BW/2-BT/2, ry:Math.PI/2 }, { name:'direita', x:BW/2-BT/2, z:0, ry:0 } ];
 const lamMatCache = {};
-function drawIcon(g, model, stroke){
-  g.strokeStyle=stroke; g.lineWidth=4; g.lineJoin='round'; g.beginPath();
-  if (model==='casa'){ g.rect(44,30,40,30); g.moveTo(38,32); g.lineTo(64,8); g.lineTo(90,32); g.rect(58,42,12,18); g.moveTo(74,16); g.lineTo(74,10); g.lineTo(80,10); g.lineTo(80,21); }
-  else if (model==='barco'){ g.moveTo(26,40); g.lineTo(102,40); g.lineTo(88,58); g.lineTo(38,58); g.closePath(); g.rect(46,26,36,14); g.rect(54,12,7,14); g.rect(66,12,7,14); g.moveTo(54,49); g.arc(52,49,3,0,7); g.moveTo(67,49); g.arc(65,49,3,0,7); g.moveTo(80,49); g.arc(78,49,3,0,7); }
-  else { for(let i=0;i<10;i++){ const a=-Math.PI/2+i*Math.PI/5, r=i%2?11:26; const x=64+Math.cos(a)*r, y=35+Math.sin(a)*r; i?g.lineTo(x,y):g.moveTo(x,y); } g.closePath(); }
-  g.stroke();
-}
-function lamMat(color, model){
-  const key=color+model; if (lamMatCache[key]) return lamMatCache[key];
-  const c=document.createElement('canvas'); c.width=128; c.height=68; const g=c.getContext('2d');
-  g.fillStyle=hex(LAM_COL[color]); g.fillRect(0,0,128,68);
-  drawIcon(g, model, color==='preto'||color==='azul'||color==='verde' ? '#f4f4f4' : '#141414');
-  const face = new THREE.MeshStandardMaterial({ map:tex(c), roughness:.35 });
-  const side = std(LAM_COL[color],{roughness:.35});
-  return lamMatCache[key] = [face, face, side, side, side, side];
-}
-function makeLam(color, model){ const m=new THREE.Mesh(lamGeo, lamMat(color, model)); m.castShadow=true; m.userData={ color, model }; return m; }
+const lamMat = color => lamMatCache[color] ??= std(LAM_COL[color],{roughness:.3});          // lâmina de acrílico lisa, só a cor
+function makeLam(color){ const m=new THREE.Mesh(lamGeo, lamMat(color)); m.castShadow=true; m.userData={ color, part:{ kind:'lam' } }; return m; }
 const clickBlocks = [];
 let blockSeq = 0;
 function makeBlock(color){
   const g = new THREE.Group();
   const body = new THREE.Mesh(blockGeo, BLOCK_MAT[color]); body.castShadow = body.receiveShadow = true; g.add(body);
   const blk = { id:++blockSeq, g, color, order:null, floor:0, s:0, state:'off', target:null, lam:[null,null,null], rfid:'Base em estoque', tampa:false };
-  body.userData.blockRef = blk;
+  body.userData.blockRef = blk; g.userData.part = { kind:'block', blk };
   clickBlocks.push(body);
   return blk;
 }
-function makeTampa(){ const t=new THREE.Mesh(tampaGeo, M.tampa); t.castShadow=true; return t; }
+function makeTampa(){ const t=new THREE.Mesh(tampaGeo, M.tampa); t.castShadow=true; t.userData.part = { kind:'tampa' }; return t; }
 
 /* =============== belt traffic =============== */
 const belt = [];
@@ -1624,7 +1624,7 @@ const logList = document.getElementById('logList');
 const clock2 = t => `${String(Math.floor(t/60)).padStart(2,'0')}:${String(Math.floor(t%60)).padStart(2,'0')}`;
 function log(msg){ const li=document.createElement('li'); li.innerHTML=`<time>${clock2(S.simT)}</time><span>${msg}</span>`; logList.prepend(li); while(logList.children.length>9) logList.lastChild.remove(); }
 const rnd = a => a[Math.floor(Math.random()*a.length)];
-const randomFloor = () => ({ block:rnd(['preto','preto','vermelho','azul']), lam:[0,1,2].map(()=>({ c:rnd(Object.keys(LAM_COL)), m:rnd(MODELS) })) });
+const randomFloor = () => ({ block:rnd(['preto','preto','vermelho','azul']), lam:[0,1,2].map(()=>({ c:rnd(Object.keys(LAM_COL)) })) });
 function newOrder(floors, manual){
   const o = { id:++orderSeq, floors, status:'Planejada', t0:null, released:0 };
   orders.push(o); renderOrders();
@@ -1633,7 +1633,7 @@ function newOrder(floors, manual){
 }
 function autoOrder(){ const n = rnd([1,1,1,2,2,3]); newOrder(Array.from({length:n}, randomFloor), false); }
 const stations = [];
-const deposit = { key:null, items:[null,null,null], redo:[], free:true };   // depósito de lâminas do lado direito do processo (free: manipulador do processo fora da área)
+const deposit = { key:null, items:[null,null,null], redo:[], free:true };   // abas inclinadas de retirada do processo, uma lâmina por aba (free: manipulador do processo fora da área)
 const procTasks = [];
 
 
@@ -1813,22 +1813,60 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
 /* ---------- 2 · PROCESSO : LEFS16RB-400 (X) + LEYG16MB-150 (Y) + cilindro mini ISO Ø12 com guia (Z) + ventosa 25 mm ---------- */
 {
   const b = BENCH[1], g = benches[1];
-  const LCOL = Object.keys(LAM_COL);
-  const MAG_Z = -0.14, SLOT_X = i => -0.187 + i*0.022;              // 6 cores × 3 desenhos = 18 posições
-  const DEP_X = 0.21, DEP_Z = [-0.11, -0.055, 0.0];                  // depósito do lado direito (pega do robô)
-  const COMB_Y = TABLE_Y + 0.014, LAM_Y = COMB_Y + LAM_H/2, LAM_TOP = COMB_Y + LAM_H;
-  // 6 · magazine das lâminas: base preta em L com dedos que seguram as lâminas em pé
-  box(0.42, 0.014, 0.06, M.black, 0.0, TABLE_Y+0.007, MAG_Z, g);
-  box(0.42, 0.03, 0.004, M.black, 0.0, TABLE_Y+0.015, MAG_Z-0.032, g);
-  for (let i=0;i<=18;i++) box(0.006, LAM_H*0.7, 0.05, M.black, SLOT_X(i)-0.011, COMB_Y+LAM_H*0.35, MAG_Z, g).castShadow=false;
-  const slots = [];
-  LCOL.forEach((c,ci)=>MODELS.forEach((m,mi)=>{ const i=ci*3+mi; const l=makeLam(c,m); l.position.set(SLOT_X(i), LAM_Y, MAG_Z); g.add(l); slots[i]=l; }));
+  // 6 · magazine de lâminas (desenho 102436): calha de inox elevada em 2 perfis 30×60, 6 compartimentos com as lâminas
+  // empilhadas deitadas, placa de acrílico da cor no fundo, guias de acrílico preto atrás e chapa frontal com recorte em U
+  const MAG_COL = ['branco','preto','verde','amarelo','azul','vermelho'];            // ordem do desenho, da esquerda para a direita
+  const MAG_Z = -0.14, MAG_X = i => 0.0125 + (i-2.5)*0.056, NSTK = 10;
+  const FLOOR = TABLE_Y + 0.035, STK0 = FLOOR + 0.002;                                 // fundo da calha; placa da cor de 2 mm por cima
+  const inox = std(0xb4babf,{roughness:.35,metalness:.85}), acr = std(0x0e0f10,{roughness:.25,metalness:0});
+  const MX0 = MAG_X(0)-0.031, MX1 = MAG_X(5)+0.031, MCX = (MX0+MX1)/2, MLEN = MX1-MX0;
+  box(MLEN, 0.004, 0.044, inox, MCX, FLOOR-0.002, MAG_Z, g);                                          // fundo
+  for (const sx of [MX0-0.002, MX1+0.002]) box(0.004, 0.05, 0.044, inox, sx, FLOOR+0.021, MAG_Z, g);  // espaçadores laterais
+  box(MLEN, 0.036, 0.003, inox, MCX, FLOOR+0.014, MAG_Z-0.0205, g);                                   // lateral traseira
+  // lateral frontal com recorte em U no meio de cada compartimento (pegar a lâmina com o dedo)
+  for (let i=0;i<6;i++){
+    const x = MAG_X(i);
+    for (const sx of [-1,1]) box(0.018, 0.036, 0.003, inox, x+sx*0.019, FLOOR+0.014, MAG_Z+0.0205, g);
+    box(0.02, 0.012, 0.003, inox, x, FLOOR+0.002, MAG_Z+0.0205, g);
+    const idp = box(0.05, 0.002, 0.036, std(LAM_COL[MAG_COL[i]],{roughness:.3}), x, FLOOR+0.001, MAG_Z, g); idp.castShadow = false;   // identificação da cor
+  }
+  // guias de acrílico preto entre os compartimentos: dedo alto atrás, divisória baixa até a frente
+  for (let i=0;i<=6;i++){
+    const x = i===0 ? MX0+0.002 : i===6 ? MX1-0.002 : (MAG_X(i-1)+MAG_X(i))/2;
+    box(0.006, 0.05, 0.008, acr, x, FLOOR+0.025, MAG_Z-0.015, g);
+    box(0.004, 0.022, 0.03, acr, x, FLOOR+0.011, MAG_Z+0.004, g).castShadow = false;
+    const pf = cyl(0.0035,0.0035,0.003,M.alu,x,FLOOR+0.04,MAG_Z-0.0235,g,10); pf.rotation.x = Math.PI/2;           // parafuso da guia
+  }
+  for (const x of [MX0+0.03, MX1-0.03]){                                                            // 2 perfis 30×60 com cantoneiras
+    profile(FLOOR-0.004-TABLE_Y, 0.06, 0.03, 'y', x, (FLOOR-0.004+TABLE_Y)/2, MAG_Z, g);
+    for (const sx of [-1,1]){ box(0.03,0.004,0.03,M.aluDark,x+sx*0.045,TABLE_Y+0.002,MAG_Z,g); box(0.004,0.025,0.03,M.aluDark,x+sx*0.032,TABLE_Y+0.0125,MAG_Z,g); }
+  }
+  // pilhas de lâminas deitadas: largura (46 mm) ao longo do magazine, altura (24 mm) na profundidade
+  const FLAT = new THREE.Euler(Math.PI/2, Math.PI/2, 0);
+  const stacks = MAG_COL.map(() => []);
+  const fillStack = i => { const s = stacks[i]; while (s.length < NSTK){ const l = makeLam(MAG_COL[i]); l.rotation.copy(FLAT); l.position.set(MAG_X(i), STK0 + LAM_T*(s.length+0.5), MAG_Z); g.add(l); s.push(l); } };
+  MAG_COL.forEach((_,i)=>fillStack(i));
+  // abas inclinadas de retirada (alargadores de acrílico): dois pentes paralelos com 3 rampas de 45°.
+  // A lâmina reclina na rampa com a borda de baixo no vão, a face para a frente e as bordas laterais para fora dos pentes, onde a garra do robô pega.
+  const RAMP_B = Math.PI/4, RP = 0.03, RH = RP*Math.tan(Math.PI/2 - RAMP_B), RZ0 = -0.10, RYV = TABLE_Y + 0.03;
+  const DEP_X = 0.21, DEP_L = -0.185;                                                    // direita: pega do robô · esquerda: retirada manual
+  const comb = (() => {
+    const s = new THREE.Shape(), z1 = RZ0 + 3*RP, yb = TABLE_Y + 0.006 - RYV;
+    s.moveTo(RZ0-0.006, yb); s.lineTo(RZ0-0.006, RH); s.lineTo(RZ0, RH);
+    for (let k=1;k<=3;k++){ s.lineTo(RZ0+k*RP, 0); s.lineTo(RZ0+k*RP, RH); }                  // rampa sobe para trás; parede vertical na frente do vão
+    s.lineTo(z1+0.006, RH); s.lineTo(z1+0.006, yb); s.closePath();
+    const geo = new THREE.ExtrudeGeometry(s, { depth:0.005, bevelEnabled:false }); geo.rotateY(-Math.PI/2); return geo;
+  })();
+  for (const cx of [DEP_X, DEP_L]){
+    box(0.044, 0.006, 3*RP+0.03, inox, cx, TABLE_Y+0.003, RZ0+1.5*RP, g);                                // chapa de base de inox
+    for (const sx of [-1,1]){ const m = new THREE.Mesh(comb, acr); m.position.set(cx+sx*0.011+0.0025, RYV, 0); m.castShadow = m.receiveShadow = true; g.add(m); }
+    for (const dz of [0.004, 3*RP-0.004]) box(0.03, 0.01, 0.005, acr, cx, TABLE_Y+0.011, RZ0+dz, g);    // espaçadores entre os pentes
+  }
+  const rampU = new THREE.Vector3(0, Math.cos(RAMP_B), -Math.sin(RAMP_B)), rampN = new THREE.Vector3(0, Math.sin(RAMP_B), Math.cos(RAMP_B));
+  const rampC = j => new THREE.Vector3(DEP_X, RYV, RZ0 + (j+1)*RP).addScaledVector(rampU, LAM_H/2).addScaledVector(rampN, LAM_T/2);   // centro da lâmina na rampa j
   // 7 · base para gravação das lâminas: pedestal de alumínio com berço preto
   box(0.04,0.05,0.045,M.alu,-0.257,TABLE_Y+0.025,MAG_Z,g); box(0.044,0.024,0.05,M.black,-0.257,TABLE_Y+0.062,MAG_Z,g);
   box(0.006,0.014,0.042,std(0x050505),-0.257,TABLE_Y+0.068,MAG_Z,g).castShadow=false;
-  // depósito do lado direito (pega do robô): suporte preto serrilhado, uma lâmina por vão
-  box(0.05,0.012,0.17,M.black,DEP_X,TABLE_Y+0.006,-0.055,g);
-  DEP_Z.forEach(z=>{ for (const dx of [-1,1]){ box(0.012,0.022,0.046,M.black,DEP_X+dx*0.009,COMB_Y+0.007,z,g).castShadow=false; const t = box(0.01,0.01,0.046,M.black,DEP_X+dx*0.012,COMB_Y+0.019,z,g); t.rotation.z = dx*0.6; } });
   // passa-cabos no tampo
   cyl(0.026,0.026,0.004,M.white,0.08,TABLE_Y+0.002,-0.24,g,24); cyl(0.017,0.017,0.005,M.black,0.08,TABLE_Y+0.003,-0.24,g,20);
   // pórtico (foto): 3 colunas de perfil 40×40 com cantoneiras e chapa de aço sob o eixo X
@@ -1869,16 +1907,17 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
   const CR = 0.02, cyUp = new THREE.Group(); cyUp.rotation.y = -Math.PI/2; yM.add(cyUp);
   { const q = new THREE.Mesh(new THREE.TorusGeometry(CR,0.006,6,12,Math.PI/2), M.chain); q.rotation.z = Math.PI; q.castShadow = true; cyUp.add(q);
     box(0.012,0.035,0.024,M.chain,-CR,0.0175,0,cyUp); }
-  // calibração: Z recuado = 90 mm acima das lâminas; X centrado no curso; Y com a ventosa sobre o magazine no início do curso
+  // calibração: Z recuado com a lâmina na ventosa acima das guias do magazine; X centrado no curso; Y com a ventosa sobre o magazine no início do curso
+  const ZUP = FLOOR + 0.075;
   ax.set(0.2); ay.set(0); az.set(0); placeCup(0.1);
-  const ZUP = LAM_TOP + 0.09;
   placeCup(0.1 + lp(tip, g).y - ZUP);
   const t0 = lp(tip, g);
   ay.g.position.z += (MAG_Z - 0.005) - t0.z;
   const tz0 = lp(tip, g).z, tx0 = lp(tip, g).x;                     // ventosa com X no meio do curso (t = 0,2)
   const yBodyZ = ay.g.position.z;
   cyUp.position.set(0, 0.008+0.044+0.007+CR, yBodyZ-0.08);              // início da curva = ponta traseira do trecho deitado
-  const pose = { x:0, z:-0.07, y:ZUP };
+  const PARK = { x:0, z:-0.06 };
+  const pose = { ...PARK, y:ZUP, tl:0 };                              // tl: 0 = lâmina deitada na ventosa · 1 = assentada na rampa (ventosa amortecida)
   let held = null;
   const run = new Runner(pose, p=>{
     ax.set(0.2 + p.x - tx0); ay.set(p.z - tz0); az.set(ZUP - p.y);
@@ -1887,36 +1926,38 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
     span(cxA, XF, xb, 'x'); span(cxB, xc, xb, 'x'); cxLoop.position.set(xb, PY+0.025, BZ-0.05); cxTab.position.x = xc;
     // porta-cabos Y: da ponta fixa (traseira do LEYG) até a placa móvel
     const zp = ay.plate.position.z + yBodyZ; span(cyA, yBodyZ-0.08, zp, 'z');
-    if (held) follow(held, tip, LAM_H/2, 0);
+    if (held){ tip.getWorldPosition(_v); const a = p.tl*(Math.PI/2 - RAMP_B) - Math.PI/2; held.rotation.set(a, Math.PI/2, 0); held.position.set(_v.x, _v.y + Math.sin(a)*LAM_T/2, _v.z - Math.cos(a)*LAM_T/2); }
   });
   const f = { zdown:false, vac:false };
-  const zDown = () => [ act(()=>{ f.zdown=true; }), mv({ y:LAM_TOP }, 0.3) ];
-  const zUp = () => [ act(()=>{ f.zdown=false; }), mv({ y:ZUP }, 0.3) ];
-  const pickPlace = (c, m, j, wrong) => {
-    const si = LCOL.indexOf(c)*3 + MODELS.indexOf(m); let lam;
+  const zDown = y => [ act(()=>{ f.zdown=true; }), mv({ y }, 0.3) ];
+  const zUp = () => [ act(()=>{ f.zdown=false; }), mv({ y:ZUP, tl:0 }, 0.3) ];
+  // pega a lâmina de cima da pilha da cor e a deita na rampa j, na ordem esquerda, frontal, direita
+  const pickPlace = (c, j, wrong) => {
+    const i = MAG_COL.indexOf(c), C = rampC(j), T = C.clone().addScaledVector(rampN, LAM_T/2); let lam;
     return [
-      mv({ x:SLOT_X(si), z:MAG_Z }, 0.9), ...zDown(),
-      act(()=>{ lam = slots[si]; if (wrong){ const wc = rnd(LCOL.filter(x=>x!==c)); lam.material = lamMat(wc, m); lam.userData.color = wc; } f.vac=true; scene.attach(lam); held=lam; }), wait(0.2),
+      mv({ x:MAG_X(i), z:MAG_Z }, 0.9),
+      act(()=>{ f.zdown=true; }), mvf(()=>({ y:STK0 + LAM_T*stacks[i].length }), 0.3),      // desce até o topo da pilha: a ventosa amortecida compensa a altura
+      act(()=>{ lam = stacks[i].pop(); if (wrong){ const wc = rnd(MAG_COL.filter(x=>x!==c)); lam.material = lamMat(wc); lam.userData.color = wc; } f.vac=true; scene.attach(lam); held=lam; }), wait(0.2),
       ...zUp(),
-      act(()=>{ const nl=makeLam(c,m); nl.position.set(SLOT_X(si), LAM_Y, MAG_Z); g.add(nl); slots[si]=nl; }),
-      mv({ x:DEP_X, z:DEP_Z[j] }, 0.9), ...zDown(),
-      act(()=>{ f.vac=false; held=null; place(g, lam, DEP_X, LAM_Y, DEP_Z[j], 0); deposit.items[j] = { mesh:lam, color:lam.userData.color, model:m }; }),
+      act(()=>{ if (stacks[i].length < 3){ fillStack(i); log(`Processo: operador reabasteceu o compartimento ${c} do magazine`); } }),
+      mv({ x:T.x, z:T.z }, 0.9), ...zDown(T.y + 0.026), mv({ y:T.y, tl:1 }, 0.3),               // a lâmina deitada passa acima dos dentes e assenta reclinada
+      act(()=>{ f.vac=false; held=null; g.attach(lam); lam.position.copy(C); lam.rotation.set(-RAMP_B, Math.PI/2, 0); deposit.items[j] = { mesh:lam, color:lam.userData.color }; }), wait(0.1),
       ...zUp(),
     ];
   };
   const st = {
     name:'Processo', run, f, task:null,
-    desc:'Separa as lâminas de acabamento do pedido: cores azul, vermelho, branco, preto, amarelo e verde, com os desenhos escolhidos na loja. O atuador elétrico X (SMC LEFS16RB-400), o atuador elétrico Y com haste guiada (SMC LEYG16MB-150) e o eixo Z pneumático (cilindro mini ISO Ø12 com guia de buchas e ventosa de 25 mm) levam 3 lâminas por andar do magazine ao depósito do lado direito. As lâminas do andar seguinte só são separadas depois que o robô retirou as do andar anterior.',
-    kit:'CLP S7-1200 · IHM KTP700 · SMC LEFS16RB-400 (eixo X) · SMC LEYG16MB-150 (eixo Y) · cilindro mini ISO Ø12 × 100 com guia linear (eixo Z) · ventosa 25 mm amortecida + vacuostato · magazine de lâminas (6 cores × 3 desenhos) · base para gravação das lâminas',
+    desc:'Separa as lâminas de acabamento do pedido nas cores azul, vermelho, branco, preto, amarelo e verde. As lâminas ficam empilhadas no magazine, um compartimento por cor com a placa da cor no fundo. O atuador elétrico X (SMC LEFS16RB-400), o atuador elétrico Y com haste guiada (SMC LEYG16MB-150) e o eixo Z pneumático (cilindro mini ISO Ø12 com guia de buchas e ventosa amortecida de 25 mm) pegam a lâmina de cima da pilha e a deitam nas abas inclinadas de retirada, na ordem esquerda, frontal e direita, para o robô pegar. As lâminas do andar seguinte só são separadas depois que o robô retirou as do andar anterior.',
+    kit:'CLP S7-1200 · IHM KTP700 · SMC LEFS16RB-400 (eixo X) · SMC LEYG16MB-150 (eixo Y) · cilindro mini ISO Ø12 × 100 com guia linear (eixo Z) · ventosa 25 mm com 40 mm de curso amortecido + vacuostato · magazine de lâminas de inox com 6 compartimentos (uma cor por compartimento) · abas inclinadas de retirada em acrílico · base para gravação das lâminas',
     msg:'Aguardando OP', prog:0,
     busy(){ return run.busy; },
-    detail(){ return this.task ? `OP${this.task.o.id} · andar ${this.task.k+1}` : (deposit.key ? 'Depósito ocupado' : 'Depósito livre'); },
+    detail(){ return this.task ? `OP${this.task.o.id} · andar ${this.task.k+1}` : (deposit.key ? 'Abas de retirada ocupadas' : 'Abas de retirada livres'); },
     update(){
       if (run.busy) return;
       if (deposit.redo.length){
         const j = deposit.redo.shift(), t = this.task; const want = t.fl.lam[j];
-        this.msg = `Reposição: lâmina ${WALL[j].name} ${want.c}/${want.m}`;
-        run.add(act(()=>{ deposit.free=false; }), pickPlace(want.c, want.m, j, false), mv({ x:0, z:-0.07 }, 0.7), act(()=>{ deposit.free=true; }));
+        this.msg = `Reposição: lâmina ${WALL[j].name} ${want.c}`;
+        run.add(act(()=>{ deposit.free=false; }), pickPlace(want.c, j, false), mv(PARK, 0.7), act(()=>{ deposit.free=true; }));
         log(`Processo: repondo a lâmina ${WALL[j].name} da OP${t.o.id}`);
         return;
       }
@@ -1924,14 +1965,14 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
       const t = procTasks.shift(); this.task = t; deposit.key = t.key; deposit.items=[null,null,null]; deposit.free=false;
       t.fl.lam.forEach((l,j)=>{
         const wrong = S.qc && Math.random() < 0.08;
-        run.add(act(()=>{ this.msg=`Andar ${t.k+1}: lâmina ${WALL[j].name} ${l.c} · ${l.m}`; this.prog=j/3; }), pickPlace(l.c, l.m, j, wrong));
+        run.add(act(()=>{ this.msg=`Andar ${t.k+1}: lâmina ${WALL[j].name} ${l.c} → aba ${j+1}`; this.prog=j/3; }), pickPlace(l.c, j, wrong));
       });
-      run.add(act(()=>{ this.prog=1; log(`Processo: lâminas do andar ${t.k+1} da OP${t.o.id} no depósito`); }), mv({ x:0, z:-0.07 }, 0.8), act(()=>{ this.prog=0; deposit.free=true; }));
+      run.add(act(()=>{ this.prog=1; log(`Processo: lâminas do andar ${t.k+1} da OP${t.o.id} nas abas de retirada`); }), mv(PARK, 0.8), act(()=>{ this.prog=0; deposit.free=true; }));
     },
     io(){ return [
       ['sec','Entradas CLP'],
       ['I','%I0.1','Emergência', !S.estop],
-      ['I','%I0.2','Eixo Z avançado', pose.y < LAM_TOP+0.005],
+      ['I','%I0.2','Eixo Z avançado', f.zdown && pose.y < ZUP-0.02],
       ['I','%I0.3','Eixo Z recuado', pose.y > ZUP-0.005],
       ['I','%I0.4','Vacuostato manipulador', f.vac],
       ['I','%I0.5','Vacuostato base de gravação', false],
@@ -1942,8 +1983,10 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
       ['Q','%Q0.3','Motor esteira 1 e giro', S.belt],
       ['Q','%Q0.4','Motor esteira 2', S.belt],
       ['sec','Drives'],
-      ['A','LEFS16RB','Eixo X', ((pose.x+0.2)*1000).toFixed(0)+' mm'],
+      ['A','LEFS16RB','Eixo X', ((0.2+pose.x-tx0)*1000).toFixed(0)+' mm'],
       ['A','LEYG16MB','Eixo Y', ((pose.z-tz0)*1000).toFixed(0)+' mm'],
+      ['sec','Magazine de lâminas'],
+      ...MAG_COL.map(c=>['A','Pilha', cap(c), `${stacks[MAG_COL.indexOf(c)].length} lâminas`]),
     ]; }
   };
   stations.push(st);
@@ -2015,7 +2058,7 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
   const polar = (x,z) => ({ a:Math.atan2(z-BZ, x-BX), rr:Math.hypot(x-BX, z-BZ) });
   const OPEN = 0.038;                                               // Co-act EGH: 40 mm por mordente
   const HOMEP = { x:0.13, y:TABLE_Y+0.32, z:0.02 };
-  const pose = { ...polar(HOMEP.x, HOMEP.z), y:HOMEP.y, w:0, gw:OPEN };
+  const pose = { ...polar(HOMEP.x, HOMEP.z), y:HOMEP.y, w:0, gw:OPEN, lb:0 };     // lb: inclinação da lâmina presa pelas bordas (0 = pendurada na vertical)
   const unwrap = (a, ref) => ref + Math.atan2(Math.sin(a-ref), Math.cos(a-ref));
   const mvR = (target, t=0.9) => ({ get to(){ const T = typeof target==='function' ? target() : target; const out = { ...T }; delete out.x; delete out.z; if (T.x!==undefined){ const p = polar(T.x, T.z); out.a = unwrap(p.a, pose.a); out.rr = p.rr; } return out; }, t });
   // transferência segura (movimento de junta): o braço recolhe junto à base e sobe, gira e só então estende.
@@ -2035,7 +2078,8 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
     const x = BX + p.rr*Math.cos(p.a), z = BZ + p.rr*Math.sin(p.a);
     ur.ik(x - BX, p.y + egh.TCP - BASE_Y, z - BZ, p.w);
     egh.set(p.gw);
-    if (held) follow(held.obj, tip, held.dy, p.w);
+    if (held?.lam) poseLam(held.obj, p.w, p.lb);
+    else if (held) follow(held.obj, tip, held.dy, p.w);
   });
   const fpose = { f:0 };
   let onPlate = null;
@@ -2043,9 +2087,17 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
   const f = { stop:false, vac:false, fwd:false, back:false, rfid:'', cam:'', camOk:true };
   const A = { order:null, next:0, placed:[], lamDone:0, feedBlk:null, finishing:false, stackOnPlate:null, pushing:false };
   const hold = (obj, dy) => { scene.attach(obj); held = { obj, dy }; };
+  // lâmina presa pelas bordas laterais (mordentes no X da flange), GL abaixo da aresta de cima; gira em torno do eixo dos mordentes
+  const GL = LAM_H/2 - 0.006, _qw = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qe = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), Math.PI/2);
+  function poseLam(o, w, lb){
+    o.quaternion.setFromAxisAngle(_v.set(0,1,0), w).multiply(_qb.setFromAxisAngle(_v.set(1,0,0), lb)).multiply(_qe);
+    tip.getWorldPosition(o.position); o.position.addScaledVector(_v.set(0,1,0).applyQuaternion(o.quaternion), -GL);
+  }
+  const holdLam = obj => { scene.attach(obj); held = { obj, lam:true }; };
+  const fallTo = (o, y1) => until(dt=>{ o.position.y = Math.max(y1, o.position.y - dt*0.3); return o.position.y <= y1; });
   const st = {
     name:'Montagem', run, f, stopS:STOP_S, A,
-    desc:'Empilha os andares do Smart Block e encaixa as lâminas. A base de translado puxa cada base da esteira, e o robô colaborativo UR3e, com a garra colaborativa SCHUNK Co-act EGH, a coloca na posição: andar inferior à direita, do meio no centro, superior à esquerda. O robô pega as lâminas no depósito do processo, mostra cada uma à câmera MVISIA, encaixa nas ranhuras, põe a tampa no andar superior, empilha os andares e devolve o pedido à esteira.',
+    desc:'Empilha os andares do Smart Block e encaixa as lâminas. A base de translado puxa cada base da esteira, e o robô colaborativo UR3e, com a garra colaborativa SCHUNK Co-act EGH, a coloca na posição: andar inferior à direita, do meio no centro, superior à esquerda. O robô pega cada lâmina pelas bordas laterais nas abas inclinadas do processo (ela pende na vertical entre os mordentes), mostra a face à câmera MVISIA, gira a garra 90° em relação à parede e a solta logo acima da ranhura, põe a tampa no andar superior, empilha os andares e devolve o pedido à esteira.',
     kit:'CLP S7-1500 · IHM KTP700 · Universal Robots UR3e (alcance 500 mm, carga 3 kg) · garra colaborativa SCHUNK Co-act EGH (IO-Link, anel de LED de status, 40 mm por mordente) · câmera MVISIA · magazine de tampa e base de montagem · rampa alimentadora de Smart Block · base de translado com ventosa ZPT25 · interface IO-Link da garra · válvulas',
     msg:'Aguardando base', prog:0,
     busy(){ return run.busy || frun.busy; },
@@ -2095,20 +2147,25 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
     },
     lamSteps(ctx, j){
       let it;
-      const top = TABLE_Y + 0.014 + LAM_H, gy = top - 0.008;
       return [
         act(()=>{ this.msg=`Andar ${ctx.k+1} · lâmina ${WALL[j].name}: aguardando o processo`; }),
-        until(()=>deposit.key===ctx.key && !!deposit.items[j] && deposit.free),           // intertravamento: manipulador do processo fora do depósito
-        act(()=>{ it=deposit.items[j]; ctx.dp = g.worldToLocal(it.mesh.getWorldPosition(new THREE.Vector3())); this.msg=`Andar ${ctx.k+1} · lâmina ${WALL[j].name}: retirando do depósito`; }),
-        ...xfer(()=>({ x:ctx.dp.x, z:ctx.dp.z, w:0 }), 1.6), mv({ y:top+0.05, gw:OPEN*0.5 }, 0.4), mv({ y:gy }, 0.3), mv({ gw:LAM_T/2 }, 0.2),
-        act(()=>{ deposit.items[j]=null; hold(it.mesh, LAM_H/2-0.008); }),
-        mv({ y:YS }, 0.45),                                                               // sai do pente na vertical
+        until(()=>deposit.key===ctx.key && !!deposit.items[j] && deposit.free),           // intertravamento: manipulador do processo fora das abas
+        act(()=>{
+          it = deposit.items[j]; it.mesh.updateWorldMatrix(true, false);
+          ctx.dp = g.worldToLocal(it.mesh.localToWorld(new THREE.Vector3(0, GL, 0)));     // ponto de pega: bordas laterais, perto da aresta de cima
+          const up = new THREE.Vector3(0,1,0).applyQuaternion(it.mesh.getWorldQuaternion(new THREE.Quaternion())); ctx.lb = Math.atan2(up.z, up.y);
+          this.msg=`Andar ${ctx.k+1} · lâmina ${WALL[j].name}: retirando da aba inclinada ${j+1}`;
+        }),
+        ...xfer(()=>({ x:ctx.dp.x, z:ctx.dp.z, w:0 }), 1.6), mvf(()=>({ y:ctx.dp.y+0.05, gw:OPEN }), 0.4), mvf(()=>({ y:ctx.dp.y }), 0.35), mv({ gw:LAM_W/2 }, 0.2),
+        act(()=>{ deposit.items[j]=null; pose.lb = ctx.lb; holdLam(it.mesh); }),
+        mvf(()=>({ y:ctx.dp.y+0.02 }), 0.25), mvf(()=>({ y:ctx.dp.y+0.06, lb:0 }), 0.35),    // sai da rampa e a lâmina pende na vertical entre os mordentes
+        mv({ y:YS }, 0.35),
         act(()=>{ this.msg=`Andar ${ctx.k+1} · lâmina ${WALL[j].name}: conferência na câmera MVISIA`; }),
-        ...xfer({ x:SHOW.x, z:SHOW.z, w:0 }, 1.5), mv({ y:SHOW.y }, 0.25),
+        ...xfer({ x:SHOW.x, z:SHOW.z, w:-Math.PI/2 }, 1.5), mv({ y:SHOW.y }, 0.25),          // face da lâmina voltada para a câmera
         act(()=>{ f.cam=it.color; f.camOk = it.color===ctx.fl.lam[j].c; qcRecord(f.camOk, ctx.fl.lam[j].c); }), wait(0.8),
         act(()=>{
           const ok = f.camOk; f.cam='';
-          if (ok){ log(`Visão: OP${ctx.o.id} andar ${ctx.k+1} · ${WALL[j].name} ${it.color}/${it.model} OK`); run.front(this.insertSteps(ctx, j, it)); }
+          if (ok){ log(`Visão: OP${ctx.o.id} andar ${ctx.k+1} · ${WALL[j].name} ${it.color} OK`); run.front(this.insertSteps(ctx, j, it)); }
           else {
             log(`<b style="color:var(--warn)">Visão: lâmina ${it.color} no lugar de ${ctx.fl.lam[j].c} · descartada</b>`);
             deposit.redo.push(j);
@@ -2124,12 +2181,15 @@ const lp = (obj, g) => { scene.updateMatrixWorld(true); return g.worldToLocal(ob
       ];
     },
     insertSteps(ctx, j, it){
-      const w = WALL[j], x = ASM_X[ctx.k] + w.x, z = ASM_Z + w.z, cy = ASM_Y + 0.004 + LAM_H/2 + 0.003, gy = cy + LAM_H/2 - 0.008;
+      // mordentes nas bordas da lâmina: giram 90° em relação à parede. A garra solta a lâmina 12 mm acima do assento,
+      // com os dedos acima do bloco, e ela desce pela ranhura
+      const w = WALL[j], x = ASM_X[ctx.k] + w.x, z = ASM_Z + w.z, cy = ASM_Y + 0.004 + LAM_H/2 + 0.003, DROP = 0.012, gy = cy + GL + DROP;
       return [
         act(()=>{ this.msg=`Andar ${ctx.k+1} · encaixe da lâmina ${w.name}`; }),
-        mvR({ x, z, y:ASM_Y+BH+0.06, w:w.ry }, 1.0), mv({ y:gy }, 0.45),
-        act(()=>{ held=null; place(ctx.blk.g, it.mesh, w.x, cy-ASM_Y, w.z, w.ry); ctx.blk.lam[j]={ c:it.color, m:it.model }; }),
-        mv({ gw:OPEN*0.5 }, 0.2), mv({ y:ASM_Y+BH+0.08, w:0 }, 0.35),
+        mvR({ x, z, y:ASM_Y+BH+0.06, w:w.ry - Math.PI/2 }, 1.0), mv({ y:gy }, 0.45),
+        act(()=>{ held=null; place(ctx.blk.g, it.mesh, w.x, cy-ASM_Y+DROP, w.z, w.ry); ctx.blk.lam[j]={ c:it.color }; }),
+        mv({ gw:LAM_W/2+0.008 }, 0.12), fallTo(it.mesh, cy-ASM_Y),
+        mv({ gw:OPEN*0.6 }, 0.15), mv({ y:ASM_Y+BH+0.08, w:0 }, 0.35),
         act(()=>{ ctx.ok++; this.prog = 0.1 + 0.6*((A.lamDone*3+ctx.ok)/(A.order.floors.length*3)); if (ctx.ok===3){ deposit.key=null; A.lamDone++; ctx.blk.rfid=`OP${ctx.o.id} · andar ${ctx.k+1} com lâminas`; } }),
       ];
     },
@@ -2591,24 +2651,24 @@ function step(dt){
 const $ = id => document.getElementById(id);
 const statusClass = s => s==='Planejada' ? 'st-fila' : s==='Concluída' ? 'st-ok' : 'st-ativo';
 function renderOrders(){
-  $('orders').innerHTML = orders.slice(-7).reverse().map(o=>`<li><span class="num">OP${o.id}</span><span class="floors">${o.floors.map((fl,k)=>`<span class="fl" title="Andar ${k+1}: bloco ${fl.block} · ${fl.lam.map(l=>l.c+'/'+l.m).join(', ')}"><b style="background:${hex(BLOCK_COL[fl.block])}"></b>${fl.lam.map(l=>`<i style="background:${hex(LAM_COL[l.c])}"></i>`).join('')}</span>`).join('')}</span><span class="pill ${statusClass(o.status)}">${o.status}</span></li>`).join('');
+  $('orders').innerHTML = orders.slice(-7).reverse().map(o=>`<li><span class="num">OP${o.id}</span><span class="floors">${o.floors.map((fl,k)=>`<span class="fl" title="Andar ${k+1}: bloco ${fl.block} · lâminas ${fl.lam.map(l=>l.c).join(', ')}"><b style="background:${hex(BLOCK_COL[fl.block])}"></b>${fl.lam.map(l=>`<i style="background:${hex(LAM_COL[l.c])}"></i>`).join('')}</span>`).join('')}</span><span class="pill ${statusClass(o.status)}">${o.status}</span></li>`).join('');
 }
 // loja: personalização
 const form = { n:1, floors:[randomFloor(), randomFloor(), randomFloor()] };
-const LAM_OPTS = Object.keys(LAM_COL).flatMap(c=>MODELS.map(m=>[`${c}|${m}`, `${cap(c)} · ${cap(m)}`]));
+const LAM_OPTS = Object.keys(LAM_COL).map(c=>[c, cap(c)]);
 function renderForm(){
   const rows = [`<div class="frow fhead"><span></span><span>Bloco</span><span>Esquerda</span><span>Frontal</span><span>Direita</span></div>`];
   for (let k=0;k<form.n;k++){
     const fl = form.floors[k];
     rows.push(`<div class="frow"><span>Andar ${k+1}</span>
       <select id="fb${k}" aria-label="Cor do bloco do andar ${k+1}">${Object.keys(BLOCK_COL).map(c=>`<option value="${c}" ${c===fl.block?'selected':''}>${cap(c)}</option>`).join('')}</select>
-      ${[0,1,2].map(j=>`<select id="fl${k}_${j}" aria-label="Lâmina ${WALL[j].name} do andar ${k+1}">${LAM_OPTS.map(([v,t])=>`<option value="${v}" ${v===fl.lam[j].c+'|'+fl.lam[j].m?'selected':''}>${t}</option>`).join('')}</select>`).join('')}
+      ${[0,1,2].map(j=>`<select id="fl${k}_${j}" aria-label="Lâmina ${WALL[j].name} do andar ${k+1}">${LAM_OPTS.map(([v,t])=>`<option value="${v}" ${v===fl.lam[j].c?'selected':''}>${t}</option>`).join('')}</select>`).join('')}
     </div>`);
   }
   $('floorRows').innerHTML = rows.join('');
   for (let k=0;k<form.n;k++){
     $('fb'+k).onchange = e => form.floors[k].block = e.target.value;
-    [0,1,2].forEach(j=>$(`fl${k}_${j}`).onchange = e => { const [c,m]=e.target.value.split('|'); form.floors[k].lam[j]={ c, m }; });
+    [0,1,2].forEach(j=>$(`fl${k}_${j}`).onchange = e => { form.floors[k].lam[j]={ c:e.target.value }; });
   }
   document.querySelectorAll('#segFloors button').forEach(b=>b.setAttribute('aria-pressed', String(+b.dataset.n===form.n)));
 }
@@ -2672,7 +2732,7 @@ function updateInfo(){
       ['A','OP','Ordem de produção', o ? 'OP'+o.id : '—'],
       ['A','Andar','Posição no pedido', o ? `${b.floor+1} de ${o.floors.length}` : '—'],
       ['A','Cor','Base', b.color],
-      ...[0,1,2].map(j=>['A','Lâmina', cap(WALL[j].name), fl ? `${fl.lam[j].c}/${fl.lam[j].m}${b.lam[j]?' ✓':''}` : '—']),
+      ...[0,1,2].map(j=>['A','Lâmina', cap(WALL[j].name), fl ? `${fl.lam[j].c}${b.lam[j]?' ✓':''}` : '—']),
       ['A','Tampa','Andar superior', b.tampa ? 'Sim' : '—'],
       ['A','Status','MES', o ? o.status : 'Em estoque'],
     ]);
@@ -3300,7 +3360,7 @@ addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.up
 const clock = new THREE.Clock();
 let uiT = 0, scrT = 0;
 log('Banco de ensaios energizado · 4 CLPs online');
-newOrder([ { block:'preto', lam:[{c:'azul',m:'casa'},{c:'verde',m:'barco'},{c:'branco',m:'estrela'}] }, { block:'vermelho', lam:[{c:'amarelo',m:'estrela'},{c:'preto',m:'casa'},{c:'vermelho',m:'barco'}] } ], false);
+newOrder([ { block:'preto', lam:[{c:'azul'},{c:'verde'},{c:'branco'}] }, { block:'vermelho', lam:[{c:'amarelo'},{c:'preto'},{c:'vermelho'}] } ], false);
 function frame(){
   const rdt = Math.min(clock.getDelta(), 0.05);
   S.belt = S.running && !S.estop;
@@ -3395,7 +3455,7 @@ function drawShop(g){
     pbtn(g, cap(fl.block), 'slot', 150, y, 150, 66, { fill:hex(BLOCK_COL[fl.block]), ink:inkOn(BLOCK_COL[fl.block]), v:{ k, j:-1 } });
     if (sl && sl.k===k && sl.j===-1) outline(g, 150, y, 150, 66);
     fl.lam.forEach((l,j)=>{
-      pbtn(g, `${cap(l.c)} · ${cap(l.m)}`, 'slot', LX(j), y, 212, 66, { fill:hex(LAM_COL[l.c]), ink:inkOn(LAM_COL[l.c]), v:{ k, j }, font:'600 22px "IBM Plex Sans", sans-serif' });
+      pbtn(g, cap(l.c), 'slot', LX(j), y, 212, 66, { fill:hex(LAM_COL[l.c]), ink:inkOn(LAM_COL[l.c]), v:{ k, j }, font:'600 22px "IBM Plex Sans", sans-serif' });
       if (sl && sl.k===k && sl.j===j) outline(g, LX(j), y, 212, 66);
     });
   }
@@ -3403,13 +3463,12 @@ function drawShop(g){
   g.fillStyle='#2a3135'; g.fillRect(32, 462, PW-64, 2);
   if (!sl){
     g.fillStyle='#8d999e'; g.font='22px "IBM Plex Sans", sans-serif';
-    g.fillText('Aponte para um bloco ou uma lâmina da tabela para mudar cor e desenho.', 32, 520);
+    g.fillText('Aponte para um bloco ou uma lâmina da tabela para mudar a cor.', 32, 520);
   } else {
     const fl = form.floors[sl.k], cur = sl.j<0 ? fl.block : fl.lam[sl.j].c;
     g.fillStyle='#8d999e'; g.font=mono; g.fillText(`ANDAR ${sl.k+1} · ${sl.j<0 ? 'COR DO BLOCO' : 'LÂMINA '+WALL[sl.j].name.toUpperCase()}`, 32, 494);
     const pal = sl.j<0 ? BLOCK_COL : LAM_COL, names = Object.keys(pal), sw = (PW-64-5*10)/6;
     names.forEach((c,i)=>{ const x = 32 + i*(sw+10); pbtn(g, cap(c), 'col', x, 508, sw, 56, { fill:hex(pal[c]), ink:inkOn(pal[c]), v:c, font:'600 22px "IBM Plex Sans", sans-serif' }); if (c===cur) outline(g, x, 508, sw, 56); });
-    if (sl.j>=0) MODELS.forEach((m,i)=>pbtn(g, cap(m), 'mod', 32 + i*(sw+10)*2, 580, sw*2+10, 48, { on:fl.lam[sl.j].m===m, v:m, font:'500 22px "IBM Plex Sans", sans-serif' }));
   }
   if (performance.now() < shop.flashUntil){ g.fillStyle='#62d26f'; g.font='600 22px "IBM Plex Sans", sans-serif'; g.fillText(shop.flash, 32, 654); }
   // ações
@@ -3471,7 +3530,6 @@ function panelClick(uv){
   if (b.id==='auto') setAuto(!S.auto);
   if (b.id==='slot') shop.slot = sl && sl.k===b.v.k && sl.j===b.v.j ? null : b.v;
   if (b.id==='col'){ if (sl.j<0) form.floors[sl.k].block=b.v; else form.floors[sl.k].lam[sl.j].c=b.v; renderForm(); }
-  if (b.id==='mod'){ form.floors[sl.k].lam[sl.j].m=b.v; renderForm(); }
   if (b.id==='rand'){ form.floors=[randomFloor(),randomFloor(),randomFloor()]; renderForm(); }
   if (b.id==='submit'){ const o = placeOrder(); shop.flash=`OP${o.id} enviada ao MES · ${o.floors.length} andar(es)`; shop.flashUntil=performance.now()+4000; }
   if (b.id==='play' && !S.estop){ S.running=!S.running; btnPlay.textContent=S.running?'Pausar':'Retomar'; }
@@ -3604,7 +3662,7 @@ const TP = {
   prog:null, sel:null, clip:null, exec:null, wpEdit:null, mrp:null, vars:{}, scroll:0, wpSeq:0,
   dio:{ di:Array(8).fill(false), do:Array(8).fill(false), ci:Array(8).fill(false), co:Array(8).fill(false), tdi:[false,false], tdo:[false,false] },
   log:[], stats:{ lin:0, rot:0, joint:0, free:0, newProg:false, ran:0, placedB:false, waitDi:false, tcpSeen:false, homeSet:false, home:0, tcp0:false },
-  holdBy:-1, open:false, gw:RB.OPEN, train:null, grasped:null, view:{ az:0.75, el:0.38 },
+  holdBy:-1, held:false, open:false, gw:RB.OPEN, train:null, grasped:null, falls:[], snap:null, view:{ az:0.75, el:0.38 },
   lesson:0, lstep:0, estop:false, auto:null, brake:null, limit:'', saved:{},
 };
 const tt = (pt, en) => TP.lang==='en' ? en : pt;
@@ -3742,43 +3800,112 @@ function spawnTrain(){
   const b = makeBlock('azul'); b.rfid = 'Peça de treino do teach pendant'; b.train = true;
   place(RB.g, b.g, TRAIN.A.x, TABLE_Y, TRAIN.A.z, 0); TP.train = b;
 }
+const isUnder = (o, root) => { for (let q=o; q; q=q.parent) if (q===root) return true; return false; };
+const visibleChain = o => { for (let q=o; q; q=q.parent) if (!q.visible) return false; return true; };
+// peças que a garra (ou a mão, no óculos) pega: blocos, lâminas e tampas. No controle local valem a peça de treino e as peças
+// que estavam paradas quando o ciclo congelou; ao voltar ao Remoto elas retornam ao lugar (o ciclo do CLP continua coerente).
+const PART_BOX = {
+  block:new THREE.Box3(V3(-BW/2,0,-BW/2), V3(BW/2,BH,BW/2)),
+  lam:new THREE.Box3(V3(-LAM_T/2,-LAM_H/2,-LAM_W/2), V3(LAM_T/2,LAM_H/2,LAM_W/2)),
+  tampa:new THREE.Box3(V3(-(BW+0.002)/2,-TAMPA_H/2,-(BW+0.002)/2), V3((BW+0.002)/2,TAMPA_H/2,(BW+0.002)/2)),
+};
+const partBox = o => PART_BOX[o.userData.part.kind];
+const grabbable = o => visibleChain(o) && o!==RB.held?.obj && o!==TPX.carry?.o && !TP.falls.some(f=>f.o===o) && (o===TP.train?.g || !!TP.snap?.has(o));
+function partsNear(p, r, all=false){
+  const out = [];
+  scene.traverse(o=>{ if (!o.userData.part || !(all ? visibleChain(o) : grabbable(o))) return; const d = o.localToWorld(partBox(o).getCenter(V3())).distanceTo(p); if (d < r) out.push({ o, d }); });
+  return out.sort((a,b)=>a.d-b.d);
+}
 function despawnTrain(){
   trainMarks.forEach(m=>m.visible = false);
   const b = TP.train; if (!b) return;
+  TP.falls = TP.falls.filter(f=>f.o!==b.g); if (TP.grasped===b.g) TP.grasped = null;
   b.g.parent?.remove(b.g); const i = clickBlocks.indexOf(b.g.children[0]); if (i>=0) clickBlocks.splice(i,1);
-  if (selBlock===b) selBlock = null; TP.train = null; TP.grasped = null;
+  if (selBlock===b) selBlock = null; TP.train = null;
 }
-const isUnder = (o, root) => { for (let q=o; q; q=q.parent) if (q===root) return true; return false; };
-const visibleChain = o => { for (let q=o; q; q=q.parent) if (!q.visible) return false; return true; };
-const dropRay = new THREE.Raycaster();
-function dropPart(b, byProg=false){
-  RB.g.attach(b.g);
-  const e = new THREE.Euler().setFromQuaternion(b.g.quaternion, 'YXZ'); b.g.rotation.set(0, e.y, 0);
-  const w = b.g.getWorldPosition(V3());
-  dropRay.set(V3(w.x, w.y+0.03, w.z), V3(0,-1,0)); dropRay.far = 1.5; dropRay.camera = camera;   // sprites exigem a câmera no raycast
-  const ex = [b.g, UR3.base, TPM.dock, dolly, TPG.mesh, panel, scMesh];
-  const h = dropRay.intersectObjects(scene.children, true).find(x=>x.object.isMesh && visibleChain(x.object) && !ex.some(r=>isUnder(x.object, r)) && (!x.face || x.face.normal.clone().transformDirection(x.object.matrixWorld).y > 0.5));
-  const y = h ? h.point.y : TABLE_Y;
-  b.g.position.y = y - RB.g.position.y;
-  if (byProg){
-    const bw = b.g.getWorldPosition(V3()), mb = trainMarks[1].getWorldPosition(V3());
-    if (Math.hypot(bw.x-mb.x, bw.z-mb.z) < 0.015 && Math.abs(bw.y-TABLE_Y) < 0.01){ TP.stats.placedB = true; tpToast(tt('Peça entregue no ponto B ✓','Part delivered at point B ✓')); }
-  }
-}
+// a garra só prende a peça se os dedos estiverem dentro dela e a largura no eixo dos mordentes couber na abertura
 function graspCandidate(){
-  const b = TP.train; if (!b || TP.grasped || TPX.carry) return null;
-  const t = RB.tip.getWorldPosition(V3()), c = b.g.getWorldPosition(V3());
-  const down = V3(0,-1,0).transformDirection(UR3.tool.matrixWorld);
-  const ok = Math.hypot(t.x-c.x, t.z-c.z) < 0.012 && t.y-c.y > 0.006 && t.y-c.y < BH-0.002 && down.y < -0.9;
-  return ok ? b : null;
+  if (TP.grasped) return null;
+  const tm = UR3.tool.matrixWorld, down = V3(0,-1,0).transformDirection(tm); if (down.y > -0.8) return null;       // pega por cima
+  const tip = RB.tip.getWorldPosition(V3()), ax = V3(1,0,0).transformDirection(tm);                                  // mordentes fecham no X da flange
+  let best = null;
+  for (const { o } of partsNear(tip, 0.08)){
+    const bb = partBox(o), lp = o.worldToLocal(tip.clone()), la = o.worldToLocal(tip.clone().add(ax)).sub(lp).normalize();
+    const sz = bb.getSize(V3()), w = Math.abs(la.x)*sz.x + Math.abs(la.y)*sz.y + Math.abs(la.z)*sz.z;
+    if (w/2 > RB.OPEN - 0.002) continue;
+    const tol = 0.005;
+    if (lp.x < bb.min.x-tol || lp.x > bb.max.x+tol || lp.z < bb.min.z-tol || lp.z > bb.max.z+tol || lp.y < bb.min.y+0.004 || lp.y > bb.max.y-0.001) continue;
+    const off = Math.hypot(lp.x-(bb.min.x+bb.max.x)/2, lp.z-(bb.min.z+bb.max.z)/2);
+    if (!best || off < best.off) best = { o, w:w/2, off };
+  }
+  return best;
+}
+// física simples: a peça solta fica em pé, cai com gravidade até a superfície de baixo, empilha sobre bloco e encaixa na ranhura
+const dropRay = new THREE.Raycaster();
+function surfaceY(o, wp, bb){
+  const ex = [o, UR3.base, TPM.dock, dolly, TPG.mesh, panel, scMesh, TPX.carry?.o].filter(Boolean);
+  let y = -Infinity, hitPart = null;
+  for (const [dx,dz] of [[0,0],[bb.min.x,bb.min.z],[bb.max.x,bb.min.z],[bb.min.x,bb.max.z],[bb.max.x,bb.max.z]]){
+    const pt = o.localToWorld(V3(dx*0.8, bb.min.y, dz*0.8));
+    dropRay.set(V3(pt.x, wp.y + bb.max.y + 0.01, pt.z), V3(0,-1,0)); dropRay.far = 2; dropRay.camera = camera;   // sprites exigem a câmera no raycast
+    const h = dropRay.intersectObjects(scene.children, true).find(x=>x.object.isMesh && visibleChain(x.object) && !ex.some(r=>isUnder(x.object, r)) && (!x.face || x.face.normal.clone().transformDirection(x.object.matrixWorld).y > 0.5));
+    if (h && h.point.y > y){ y = h.point.y; hitPart = partOf(h.object); }
+  }
+  return { y: isFinite(y) ? y : TABLE_Y, hitPart };
+}
+const partOf = o => { for (let q=o; q; q=q.parent) if (q.userData?.part) return q; return null; };
+function dropPart(o, byProg=false){
+  const kind = o.userData.part.kind, bb = partBox(o);
+  scene.attach(o); const yaw = new THREE.Euler().setFromQuaternion(o.quaternion, 'YXZ').y; o.rotation.set(0, yaw, 0); o.updateMatrixWorld();
+  const wp = o.getWorldPosition(V3());
+  // encaixes: lâmina na ranhura do bloco, bloco sobre bloco, tampa sobre o bloco
+  let par = null, lpos = null, lrot = null;
+  for (const { o:b } of partsNear(wp, 0.09, true)){
+    if (b===o || b.userData.part.kind!=='block' || isUnder(b, o)) continue;
+    const lp = b.worldToLocal(wp.clone()), byKind = k => b.children.some(c=>c!==o && c.userData?.part?.kind===k);
+    if (kind==='lam' && lp.y > -0.01 && lp.y < BH+0.07){
+      const nrm = V3(1,0,0).applyQuaternion(o.quaternion).applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion()).invert());
+      for (const w of WALL){
+        const sn = w.ry ? V3(0,0,1) : V3(1,0,0), taken = b.children.some(c=>c!==o && c.userData?.part?.kind==='lam' && Math.hypot(c.position.x-w.x, c.position.z-w.z) < 0.004);
+        if (!taken && Math.hypot(lp.x-w.x, lp.z-w.z) < 0.009 && Math.abs(nrm.dot(sn)) > 0.9){ par = b; lpos = V3(w.x, 0.004 + LAM_H/2 + 0.003, w.z); lrot = w.ry; }
+      }
+    }
+    if (kind==='block' && Math.hypot(lp.x, lp.z) < 0.015 && lp.y > BH-0.012 && !byKind('block') && !byKind('tampa')){ par = b; lpos = V3(0, BH, 0); lrot = 0; }
+    if (kind==='tampa' && Math.hypot(lp.x, lp.z) < 0.015 && lp.y > BH-0.012 && !byKind('block') && !byKind('tampa')){ par = b; lpos = V3(0, BH + TAMPA_H/2, 0); lrot = 0; }
+    if (par) break;
+  }
+  if (par){ par.attach(o); TP.falls.push({ o, y1:lpos.y, x1:lpos.x, z1:lpos.z, ry:lrot, v:0, byProg }); return; }
+  const { y } = surfaceY(o, wp, bb);
+  RB.g.attach(o);
+  if (kind==='lam'){                                                  // lâmina solta sobre superfície plana tomba e fica deitada
+    TP.falls.push({ o, y1:y - RB.g.position.y + LAM_T/2, lay:true, v:0, byProg }); return;
+  }
+  TP.falls.push({ o, y1:y - RB.g.position.y - bb.min.y, v:0, byProg });
+}
+function fallStep(dt){
+  for (const f of TP.falls){
+    const o = f.o; f.v += 9.81*dt; o.position.y = Math.max(f.y1, o.position.y - f.v*dt);
+    if (f.x1!==undefined){ const k = 1 - Math.exp(-dt*25); o.position.x += (f.x1-o.position.x)*k; o.position.z += (f.z1-o.position.z)*k; o.rotation.y += (f.ry - o.rotation.y)*k; }
+    if (f.lay) o.rotation.z += (Math.PI/2 - o.rotation.z)*Math.min(1, dt*12);
+    if (o.position.y <= f.y1 + 1e-5 && (!f.lay || Math.abs(o.rotation.z - Math.PI/2) < 0.02)){
+      if (f.x1!==undefined){ o.position.set(f.x1, f.y1, f.z1); o.rotation.set(0, f.ry, 0); }
+      if (f.lay) o.rotation.z = Math.PI/2;
+      f.done = true;
+      if (f.byProg && o===TP.train?.g){
+        const bw = o.getWorldPosition(V3()), mb = trainMarks[1].getWorldPosition(V3());
+        if (Math.hypot(bw.x-mb.x, bw.z-mb.z) < 0.015 && Math.abs(bw.y-TABLE_Y) < 0.01){ TP.stats.placedB = true; tpToast(tt('Peça entregue no ponto B ✓','Part delivered at point B ✓')); }
+      }
+    }
+  }
+  TP.falls = TP.falls.filter(f=>!f.done);
 }
 const gripTo = w => { TP.gw = w; if (!TP.sim) RB.egh.set(w); };
-function gripRelease(byProg){ const b = TP.grasped; if (!b) return; TP.grasped = null; dropPart(b, byProg); }
+function gripRelease(byProg){ const o = TP.grasped; if (!o) return; TP.grasped = null; dropPart(o, byProg); }
 function* gGrip(close, wmm, byProg=true){
-  const cand = close ? graspCandidate() : null, w0 = TP.gw, w1 = close ? (cand ? BW/2 + 0.0004 : 0.004) : clamp(wmm/2000, 0.004, RB.OPEN);
+  const cand = close ? graspCandidate() : null, w0 = TP.gw, w1 = close ? (cand ? cand.w + 0.0004 : 0.004) : clamp(wmm/2000, 0.004, RB.OPEN);
   if (!close) gripRelease(byProg);
   for (let u=0; u<1; ){ u = Math.min(1, u + TPX.dt/0.4); gripTo(w0 + (w1-w0)*ease(u)); yield; }
-  if (cand && !TP.sim){ TP.grasped = cand; UR3.tool.attach(cand.g); }
+  if (cand && !TP.sim){ TP.grasped = cand.o; UR3.tool.attach(cand.o); }
 }
 // comandos manuais da garra (barra do URCap na aba Mover)
 function manualGrip(close){
@@ -3941,7 +4068,7 @@ function drawFoot(){
   PS.btn.push({ key:'sim', x:1164, y:y+8, w:76, h:48, fn:()=>{
     if (!TP.local) return tpToast(tt('Disponível no controle local','Available in local control'));
     if (TP.exec) return tpToast(tt('Pare o programa antes de trocar o modo','Stop the program before switching mode'));
-    TP.sim = !TP.sim; TP.qSim = TP.sim ? realQ() : null; if (TP.sim) TP.grasped && gripRelease(false);
+    TP.sim = !TP.sim; TP.qSim = TP.sim ? realQ() : null; if (TP.sim && TP.grasped) gripRelease(false);
     tplog(TP.sim ? 'Modo de simulação: o braço real não se move' : 'Modo robô real'); } });
 }
 
@@ -4321,11 +4448,11 @@ function drawModal(){
   g.fillStyle = 'rgba(20,26,30,.45)'; g.fillRect(0, 0, PS.W, PS.H);
   if (m.type==='menu'){
     PS.btn.push({ key:'menu:bg', x:0, y:0, w:PS.W, h:PS.H, fn:()=>{ TP.modal = null; } });
-    fillR(990, 70, 280, TP.holdBy>=0 ? 358 : 290, '#2d3236', 6);
+    fillR(990, 70, 280, TP.held ? 358 : 290, '#2d3236', 6);
     [[tt('Ajuda','Help'),()=>msgBox(tt('Ajuda','Help'), tt('Teach pendant do UR3e (PolyScope simulado). Executar roda programas, Programa cria a árvore, Instalação configura TCP e carga útil, Mover faz o jog e o Freedrive, E/S mostra os sinais e Registro mostra o estado das juntas. Siga o roteiro de aprendizagem ao lado do pendant.','UR3e teach pendant (simulated PolyScope). Follow the learning guide next to the pendant.'))],
      [tt('Sobre','About'),()=>msgBox(tt('Sobre','About'), 'PolyScope 5 (simulado) · UR3e · Gêmeo digital Smart 4.0 · UniSENAI')],
      [`${tt('Idioma','Language')}: ${TP.lang==='pt' ? 'Português' : 'English'}`,()=>{ TP.lang = TP.lang==='pt' ? 'en' : 'pt'; guideRender(); TP.modal = null; }],
-     ...(TP.holdBy>=0 ? [[tt('Guardar pendant no suporte','Return pendant to holder'), tpRelease]] : []),
+     ...(TP.held ? [[tt('Guardar pendant no suporte','Return pendant to holder'), tpRelease]] : []),
      [tt('Desligar robô','Shutdown Robot'),()=>{ if (!TP.local) return msgBox(tt('Controle remoto','Remote control'), tt('Assuma o controle local para desligar o robô.','Take local control to power off the robot.')); robotOff(tt('Robô desligado pelo menu','Robot powered off from the menu')); TP.modal = null; }]]
       .forEach(([t,fn],i)=>{ const y = 82 + i*68; btn('mi:'+i, 1000, y, 260, 60, t, { fill:'#3b4247', ink:'#fff', noStroke:true, fs:17, fn:()=>{ TP.modal = null; fn(); } }); });
     return;
@@ -4587,6 +4714,7 @@ function modeTap(){
 function goLocal(){
   if (TP.local) return;
   TP.local = true; TP.auto = { q:realQ(), gw:RB.pose.gw, msg:MON.msg }; TP.gw = RB.pose.gw; TP.screen = TP.startShown ? null : 'start'; TP.startShown = true;
+  TP.snap = new Map(); scene.traverse(o=>{ if (o.userData.part && !belt.some(b=>b.g===o)) TP.snap.set(o, { par:o.parent, p:o.position.clone(), q:o.quaternion.clone() }); });
   spawnTrain(); tplog('Controle local assumido pelo teach pendant'); log('Montagem: UR3e em controle local pelo teach pendant (ciclo automático pausado)');
 }
 function goRemote(){
@@ -4598,7 +4726,9 @@ function goRemote(){
   startMRP(TP.auto.q, tt('Voltar à posição do ciclo automático (Remoto)','Return to the automatic cycle pose (Remote)'), finishRemote);
 }
 function finishRemote(){
-  gripRelease(false); despawnTrain(); RB.egh.set(TP.auto.gw); UR3.setJ(TP.auto.q);
+  carryEnd(); gripRelease(false); TP.falls = []; despawnTrain(); RB.egh.set(TP.auto.gw); UR3.setJ(TP.auto.q);
+  for (const [o, k] of TP.snap || []){ if (o.parent!==k.par) k.par.add(o); o.position.copy(k.p); o.quaternion.copy(k.q); }   // peças do ciclo voltam ao lugar
+  TP.snap = null;
   MON.msg = TP.auto.msg; TP.local = false; TP.auto = null; TP.screen = null; TP.tab = 'run';
   tplog('Controle devolvido ao CLP (Remoto)'); log('Montagem: UR3e de volta ao CLP · ciclo automático retomado');
 }
@@ -4706,12 +4836,12 @@ const LESSONS = [
       { t:'Toque em <b>Local</b> no cabeçalho, escolha <b>Remoto</b> e segure <b>Automático</b> até o robô voltar à posição do ciclo. A Montagem retoma sozinha.', hl:['mode','mb:1','auto'], ok:()=>!TP.local },
     ] },
 ];
-const curStep = () => (TP.open || TP.holdBy>=0 || renderer.xr.isPresenting) ? LESSONS[TP.lesson]?.steps[TP.lstep] : null;
+const curStep = () => (TP.open || TP.held || renderer.xr.isPresenting) ? LESSONS[TP.lesson]?.steps[TP.lstep] : null;
 function setLesson(i){ TP.lesson = clamp(i, 0, LESSONS.length-1); TP.lstep = 0; TP.base0 = { ...TP.stats }; guideRender(); }
 TP.base0 = { ...TP.stats };
 function lessonCheck(){
   const Ls = LESSONS[TP.lesson], st = Ls.steps[TP.lstep];
-  if (st && (TP.open || TP.holdBy>=0 || TP.local) && st.ok()){ TP.lstep++; guideRender(); if (TP.lstep >= Ls.steps.length) tpToast(`Lição ${TP.lesson+1} concluída ✓`); }
+  if (st && (TP.open || TP.held || TP.local) && st.ok()){ TP.lstep++; guideRender(); if (TP.lstep >= Ls.steps.length) tpToast(`Lição ${TP.lesson+1} concluída ✓`); }
 }
 const guideEl = $('tpGuide');
 function guideRender(){
@@ -4775,30 +4905,31 @@ const handObj = i => (TPX.isHand[i] && palm(i)) || grips[i];
 const handPos = i => { const o = handObj(i); o.updateWorldMatrix(true, false); return V3().setFromMatrixPosition(o.matrixWorld); };
 const leftIdx = () => ctrls.findIndex(c=>c.handedness==='left');
 const nearPendant = i => TP.holdBy!==i && handPos(i).distanceTo(TPM.pend.getWorldPosition(V3())) < 0.2;
-const nearTrain = i => !!TP.train && handPos(i).distanceTo(TP.train.g.getWorldPosition(V3()).add(V3(0,BH/2,0))) < 0.12;
+const nearPart = i => TP.local ? partsNear(handPos(i), 0.1)[0]?.o : null;
 const nearTool = i => handPos(i).distanceTo(UR3.tool.getWorldPosition(V3())) < 0.18;
 const onRobot = h => h && isUnder(h.object, UR3.base);
 function tpGrab(i){
-  const h = leftIdx() >= 0 ? leftIdx() : i;                          // qualquer mão seleciona; o pendant vai sempre para a esquerda
-  if (TP.holdBy===h) return;
-  TP.holdBy = h; TP.freeHold = false; scene.attach(TPM.pend); TPX.grabT = 0;
+  const h = leftIdx();                                               // qualquer mão seleciona; o pendant vai sempre para a esquerda
+  if (h < 0) return tpToast(tt('Mostre a mão esquerda (ou ligue o controle esquerdo) para segurar o pendant.','Show your left hand (or turn on the left controller) to hold the pendant.'));
+  if (TP.held) return;
+  TP.held = true; TP.holdBy = h; TP.freeHold = false; scene.attach(TPM.pend); TPX.grabT = 0;
   TPM.target = { p:TPM.pend.position.clone(), q:TPM.pend.quaternion.clone() };
   ctrls[h].gamepad?.hapticActuators?.[0]?.pulse?.(0.4, 40); guideRender();
   tpToast(tt('Pendant na mão esquerda: toque a tela com a direita (raio ou dedo). Gatilho ou pinça da esquerda = Freedrive.','Pendant on the left hand: touch the screen with the right (ray or finger). Left trigger or pinch = Freedrive.'));
 }
-function tpRelease(){ if (TP.holdBy<0) return; TPM.dock.attach(TPM.pend); TPM.target = { p:TPM.hook.position.clone(), q:TPM.hook.quaternion.clone() }; TP.holdBy = -1; TP.freeHold = false; TPG.dirty = true; }
+function tpRelease(){ if (!TP.held) return; TPM.dock.attach(TPM.pend); TPM.target = { p:TPM.hook.position.clone(), q:TPM.hook.quaternion.clone() }; TP.held = false; TP.holdBy = -1; TP.freeHold = false; TPG.dirty = true; }
 // pose do pendant na mão: logo acima da palma, deslocado para o centro do corpo e com a tela voltada para o rosto
 const _held = new THREE.Object3D();
 function heldPose(){
   const hp = handPos(TP.holdBy), head = camera.getWorldPosition(V3());
   const fwd = hp.clone().sub(head); fwd.y = 0; if (fwd.lengthSq() < 1e-6) fwd.set(0,0,-1); fwd.normalize();
-  const side = ctrls[TP.holdBy].handedness==='right' ? -1 : 1;
+  const side = 1;                                                     // mão esquerda: o pendant fica à direita dela
   _held.position.copy(hp).addScaledVector(V3(-fwd.z, 0, fwd.x), side*0.12).add(V3(0, 0.08, 0)).addScaledVector(fwd, 0.03);
   _held.lookAt(head);
   TPM.target = { p:_held.position.clone(), q:_held.quaternion.clone() };
 }
-function carryStart(i){ const b = TP.train; if (!b) return; if (TP.grasped===b) TP.grasped = null; handObj(i).attach(b.g); TPX.carry = { i }; }
-function carryEnd(){ if (!TPX.carry) return; TPX.carry = null; if (TP.train) dropPart(TP.train); }
+function carryStart(i, o){ if (!o) return; TP.falls = TP.falls.filter(f=>f.o!==o); if (TP.grasped===o) TP.grasped = null; handObj(i).attach(o); TPX.carry = { i, o }; }
+function carryEnd(){ const c = TPX.carry; if (!c) return; TPX.carry = null; dropPart(c.o); }
 function dragStart(i){ const o = handObj(i); o.updateWorldMatrix(true, false); UR3.base.updateWorldMatrix(true, false); const T = new THREE.Matrix4().multiplyMatrices(UR3.base.matrixWorld, tcpPose()); TPX.drag = { i, off:o.matrixWorld.clone().invert().multiply(T) }; TPX.freeStart = tcpPose(); }
 function xrSel(i, down){
   const st = ctrls[i];
@@ -4806,10 +4937,10 @@ function xrSel(i, down){
     let act = null;
     if (TP.holdBy===i){ act = 'free'; TP.freeHold = true; if (!freeOn()) canMove(); }
     else if (st.hit?.object===TPM.scr){ const u = st.hit.uv; psDown(u.x*PS.W, (1-u.y)*PS.H); TPX.pressBy = i; act = 'screen'; }
-    else if (TP.holdBy<0 && st.hit && isUnder(st.hit.object, TPM.pend) && !st.hit.object.userData.estop){ tpGrab(i); act = 'grab'; }
+    else if (!TP.held && st.hit && isUnder(st.hit.object, TPM.pend) && !st.hit.object.userData.estop){ tpGrab(i); act = 'grab'; }
     else if (TPX.isHand[i]){
-      if (TP.holdBy<0 && nearPendant(i)){ tpGrab(i); act = 'grab'; }
-      else if (nearTrain(i)){ carryStart(i); act = 'carry'; }
+      if (!TP.held && nearPendant(i)){ tpGrab(i); act = 'grab'; }
+      else if (nearPart(i)){ carryStart(i, nearPart(i)); act = 'carry'; }
       else if (freeOn() && nearTool(i)){ dragStart(i); act = 'drag'; }
     }
     TPX.selAct[i] = act; if (act) TPX.consumed[i] = true;
@@ -4825,8 +4956,9 @@ function xrSqz(i, down){
   const st = ctrls[i];
   if (down){
     if (TP.holdBy===i){ tpToast(tt('Para guardar o pendant, encoste-o no suporte da bancada ou use Devolver pendant.','To store the pendant, touch it to the bench holder or use Return pendant.')); return; }
-    if (TP.holdBy<0 && (nearPendant(i) || (st.hit && isUnder(st.hit.object, TPM.pend)))){ tpGrab(i); return; }
-    if (nearTrain(i) || (st.hit && TP.train && isUnder(st.hit.object, TP.train.g))){ carryStart(i); TPX.sqAct[i] = 'carry'; return; }
+    if (!TP.held && (nearPendant(i) || (st.hit && isUnder(st.hit.object, TPM.pend)))){ tpGrab(i); return; }
+    const hp = st.hit && TP.local ? partOf(st.hit.object) : null, pk = nearPart(i) || (hp && grabbable(hp) ? hp : null);
+    if (pk){ carryStart(i, pk); TPX.sqAct[i] = 'carry'; return; }
     if (nearTool(i) || onRobot(st.hit)){
       if (freeOn()){ dragStart(i); TPX.sqAct[i] = 'drag'; }
       else tpToast(tt('Freedrive desligado: segure o gatilho da mão esquerda (botão traseiro do pendant)','Freedrive off: hold the left trigger (pendant back button)'));
@@ -4838,9 +4970,27 @@ function xrSqz(i, down){
 }
 ctrls.forEach((st, i)=>{
   st.c.addEventListener('connected', e=>{ TPX.isHand[i] = !!e.data.hand; TPX.handT[i] = 0; });
+  st.c.addEventListener('disconnected', ()=>{ st.handedness = ''; TPX.isHand[i] = false; if (TP.holdBy===i) TP.holdBy = -1; });
   st.c.addEventListener('selectstart', ()=>xrSel(i, true)); st.c.addEventListener('selectend', ()=>xrSel(i, false));
   st.c.addEventListener('squeezestart', ()=>xrSqz(i, true)); st.c.addEventListener('squeezeend', ()=>xrSqz(i, false));
 });
+// o modelo do three atualiza só as articulações visíveis no quadro e mistura poses (a mão deforma): aqui a malha só muda quando
+// as 25 articulações chegam juntas e com comprimentos de osso plausíveis; com rastreamento ruim por mais de 0,2 s a mão some
+const FINGERS = ['index-finger','middle-finger','ring-finger','pinky-finger'];
+const BONE_MAX = [...FINGERS.flatMap(f=>[['wrist',`${f}-metacarpal`,0.1],[`${f}-metacarpal`,`${f}-phalanx-proximal`,0.08],[`${f}-phalanx-proximal`,`${f}-phalanx-intermediate`,0.06],[`${f}-phalanx-intermediate`,`${f}-phalanx-distal`,0.045],[`${f}-phalanx-distal`,`${f}-tip`,0.04]]),
+  ['wrist','thumb-metacarpal',0.07],['thumb-metacarpal','thumb-phalanx-proximal',0.065],['thumb-phalanx-proximal','thumb-phalanx-distal',0.05],['thumb-phalanx-distal','thumb-tip',0.045]];
+function safeHand(m){
+  const mc = m.motionController; if (!mc || mc.safe) return;
+  const upd = mc.updateMesh.bind(mc); let bad = 0, last = performance.now();
+  mc.updateMesh = function(){
+    const now = performance.now(), dt = Math.min(0.1, (now-last)/1000); last = now;
+    const J = this.controller.joints; let ok = !!J;
+    if (ok) for (const b of this.bones){ if (!b) continue; const j = J[b.jointName]; if (!j || !j.visible || !isFinite(j.position.x)){ ok = false; break; } }
+    if (ok) for (const [a, c, mx] of BONE_MAX){ const ja = J[a], jc = J[c]; if (ja && jc && ja.position.distanceTo(jc.position) > mx){ ok = false; break; } }
+    if (ok){ upd(); bad = 0; m.visible = true; } else if ((bad += dt) > 0.2) m.visible = false;
+  };
+  mc.safe = true;
+}
 // mãos: malha articulada do perfil genérico do WebXR com material de pele; sem a malha (sem internet), volta às esferas
 TPX.handT = [0,0];
 const SKIN = new THREE.MeshPhysicalMaterial({ color:0xc8957a, roughness:.55, metalness:0, sheen:.5, sheenColor:0xffd9c9, sheenRoughness:.55, clearcoat:.08, clearcoatRoughness:.6 });
@@ -4848,7 +4998,7 @@ function handSkin(dt){
   for (let i=0;i<2;i++){
     const h = hands[i], m = h.userData.model; if (!TPX.isHand[i] || !m || h.userData.skinned) continue;
     let sk = null; m.traverse(o=>{ if (o.isSkinnedMesh) sk = o; });
-    if (sk){ sk.material = SKIN; h.userData.skinned = true; continue; }
+    if (sk){ sk.material = SKIN; h.userData.skinned = true; safeHand(m); continue; }
     TPX.handT[i] += dt;
     if (TPX.handT[i] > 8 && !h.userData.fallback){ h.userData.fallback = true; h.add(handFactory.createHandModel(h, 'spheres')); }
   }
@@ -4856,8 +5006,10 @@ function handSkin(dt){
 function tpXR(dt){
   TPX.grabT += dt;
   handSkin(dt);
-  if (TP.holdBy>=0){
-    heldPose();
+  if (TP.held){
+    // o Quest reordena as entradas ao trocar controles por mãos: a mão esquerda é procurada a cada quadro
+    const L = leftIdx(); if (L !== TP.holdBy){ TP.holdBy = L; TP.freeHold = false; }
+    if (TP.holdBy >= 0) heldPose();
     // devolver o pendant ao suporte: encostá-lo no gancho na frente da bancada
     if (TPX.grabT > 1.5 && TPM.pend.getWorldPosition(V3()).distanceTo(TPM.hook.getWorldPosition(V3())) < 0.14) tpRelease();
   }
@@ -4924,7 +5076,7 @@ function guideDraw(){
   if (TP.lstep >= Ls.steps.length){ g.fillStyle = '#62d26f'; g.font = F.b(26,600); g.fillText('Lição concluída ✓', 68, y+10); }
   const bt = (t, id, x, w, on=false) => { g.fillStyle = on ? '#62d26f' : '#262c30'; g.beginPath(); g.roundRect ? g.roundRect(x, 590, w, 66, 10) : g.rect(x, 590, w, 66); g.fill(); g.fillStyle = on ? '#0b1210' : '#e6ecee'; g.font = F.b(24,600); g.textAlign = 'center'; g.fillText(t, x+w/2, 632); g.textAlign = 'left'; TPG.btn.push({ id, x, y:590, w, h:66 }); };
   bt('◀ Lição', 'prev', 28, 200); bt('Recomeçar', 'restart', 240, 220); bt('Lição ▶', 'next', 472, 200, true);
-  if (TP.holdBy>=0) bt('Devolver pendant', 'dock', 684, 312);
+  if (TP.held) bt('Devolver pendant', 'dock', 684, 312);
   TPG.t.needsUpdate = true; TPG.dirty = false;
 }
 function guideClick(uv){
@@ -4935,9 +5087,9 @@ function guideClick(uv){
 
 /* ---------- laço do pendant ---------- */
 function pendantAnim(dt){
-  const t = TPM.target, p = TPM.pend, k = 1 - Math.exp(-dt*(TP.holdBy>=0 ? 22 : 14));
+  const t = TPM.target, p = TPM.pend, k = 1 - Math.exp(-dt*(TP.held ? 22 : 14));
   p.position.lerp(t.p, k); p.quaternion.slerp(t.q, k);
-  const moving = TP.holdBy>=0 || p.position.distanceToSquared(t.p) > 1e-8;
+  const moving = TP.held || p.position.distanceToSquared(t.p) > 1e-8;
   if (moving || TPM.cableT > 0){ tpCable(); TPM.cableT = moving ? 0.4 : TPM.cableT - dt; }
 }
 function tpTick(dt){
@@ -4962,12 +5114,13 @@ function tpTick(dt){
   const q = realQ(); if (TPX.lastQ) TPX.jv += (Math.max(...q.map((v,i)=>Math.abs(v-TPX.lastQ[i])))/Math.max(dt,1e-3) - TPX.jv)*Math.min(1, dt*4); TPX.lastQ = q;
   const fb = $('tpFree'); if (fb) fb.setAttribute('aria-pressed', String(TP.free));
   pendantAnim(dt);
+  if (TP.falls.length) fallStep(dt);
   lessonCheck();
   PS.toastT -= dt; PS.t += dt;
   TPX.hoverT = Math.max(0, (TPX.hoverT||0) - dt);
-  const xrOn = renderer.xr.isPresenting, fast = TP.open || TP.holdBy>=0 || !!PS.press || TPX.pressBy>=0 || TPX.hoverT > 0;
+  const xrOn = renderer.xr.isPresenting, fast = TP.open || TP.held || !!PS.press || TPX.pressBy>=0 || TPX.hoverT > 0;
   if (PS.t > (fast ? (xrOn ? 1/12 : 1/15) : 0.5)){ PS.t = 0; tpDraw(); tpTex.needsUpdate = true; if (xrOn && TPG.dirty) guideDraw(); }   // a textura de 1280 × 800 sobe para a GPU no máximo 12×/s no óculos
-  TPG.mesh.visible = xrOn && (TP.local || TP.holdBy>=0);
+  TPG.mesh.visible = xrOn && (TP.local || TP.held);
 }
 
 renderer.setAnimationLoop(frame);
