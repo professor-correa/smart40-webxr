@@ -50,7 +50,7 @@ Dica: antes de entrar, defina o limite (Guardian) com espaço livre de cerca de 
 
 | Ação | Controles Touch Plus | Mãos (hand tracking) |
 |---|---|---|
-| Apontar | Raio verde saindo do controle | Raio saindo da mão |
+| Apontar | Raio branco saindo do controle | Raio saindo da mão |
 | Selecionar bancada, bloco, porta ou botão de emergência | Gatilho | Pinça (indicador + polegar) |
 | Usar o painel flutuante (Pausar, velocidade, Emergência/Rearmar, Loja, Portas, Visão geral) | Apontar + gatilho | Apontar + pinça |
 | Teletransporte (só em VR) | Apontar para o piso (aparece um anel verde) + gatilho | Apontar para o piso + pinça |
@@ -135,10 +135,10 @@ O robô da Montagem tem um teach pendant UR e-Series com a interface PolyScope s
 | Ação no óculos | Controles Touch Plus | Mãos (hand tracking) |
 |---|---|---|
 | Pegar o pendant (vai para a mão esquerda) | Botão de pega perto dele, ou raio + gatilho | Pinça perto do pendant |
-| Tocar a tela | Raio da mão direita + gatilho | Encostar a ponta do indicador direito na tela |
+| Tocar a tela | Com o pendant na mão: encostar a ponta do controle direito na tela (o raio some perto da tela). Com o pendant no suporte: raio + gatilho | Encostar a ponta do indicador direito na tela |
 | Freedrive (botão traseiro) | Segurar o **gatilho esquerdo** | Pinça da mão esquerda, ou botão Freedrive da tela |
-| Conduzir o robô em Freedrive | Com o Freedrive ativo, botão de pega da mão direita perto da ferramenta e mover a mão | Pinça da direita perto da ferramenta e mover a mão |
-| Pegar uma peça com a mão (controle local) | Botão de pega perto do bloco, lâmina ou tampa | Pinça perto da peça |
+| Conduzir o robô em Freedrive | Com o Freedrive ativo, botão de pega da mão direita perto da ferramenta e mover a mão | Fechar a mão (ou pinça) perto da ferramenta e mover a mão |
+| Pegar uma peça com a mão (controle local) | Botão de pega perto do bloco, lâmina ou tampa | Fechar a mão (ou pinça) perto da peça; abrir para soltar |
 | Guardar o pendant | Encostar o pendant no suporte, **Devolver pendant** no painel do roteiro ou menu ☰ → Guardar pendant no suporte | Igual |
 
 **Telas do PolyScope**

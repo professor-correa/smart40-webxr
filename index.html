@@ -2520,15 +2520,17 @@ room.traverse(o=>{
 
 /* reflexos: o mapa de ambiente passa a ser o próprio laboratório (captura cúbica a partir do centro da célula) */
 function bakeEnv(){
-  // dentro do óculos o renderer usa a câmera XR em qualquer render: a captura sairia distorcida (cena esverdeada); refaz ao sair
-  if (renderer.xr.isPresenting){ bakeEnv.pending = true; return; }
+  // dentro do óculos o renderer usaria a câmera XR na captura (cena esverdeada): o XR é desligado só durante a captura.
+  // Assim os metais do robô refletem o laboratório mesmo quando o modelo CAD termina de carregar com o óculos já em VR
+  // (antes ficavam com o ambiente branco padrão).
   const hide = [];
-  scene.traverse(o=>{ if (o.isCSS2DObject || o.userData.noEnv) { if (o.visible){ hide.push(o); o.visible=false; } } });
-  const old = scene.environment;
+  scene.traverse(o=>{ if (o.isCSS2DObject || o.userData.noEnv || o===dolly) { if (o.visible){ hide.push(o); o.visible=false; } } });
+  const old = scene.environment, xrOn = renderer.xr.enabled;
   scene.position.set(-0.2, -1.45, -0.6); scene.updateMatrixWorld(true);
-  const rt = pmrem.fromScene(scene, 0.015, 0.05, 30);
-  scene.position.set(0,0,0); scene.updateMatrixWorld(true);
-  hide.forEach(o=>o.visible=true);
+  let rt;
+  try { renderer.xr.enabled = false; rt = pmrem.fromScene(scene, 0.015, 0.05, 30); }
+  finally { renderer.xr.enabled = xrOn; scene.position.set(0,0,0); scene.updateMatrixWorld(true); hide.forEach(o=>o.visible=true); }
+  bakeEnv.done = true;
   scene.environment = rt.texture; scene.environmentIntensity = 0.5;
   if (old && old !== rt.texture) old.dispose?.();
 }
@@ -3557,7 +3559,7 @@ reticle.rotation.x = -Math.PI/2; reticle.visible = false; scene.add(reticle);
 const rayGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-1)]);
 const ctrls = [0,1].map(i=>{
   const c = renderer.xr.getController(i); dolly.add(c);
-  const line = new THREE.Line(rayGeo, new THREE.LineBasicMaterial({ color:0x62d26f, transparent:true, opacity:.8 })); line.scale.z = 3; c.add(line);
+  const line = new THREE.Line(rayGeo, new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:.85 })); line.scale.z = 3; c.add(line);
   const grip = renderer.xr.getControllerGrip(i); grip.add(ctrlFactory.createControllerModel(grip)); dolly.add(grip);
   const hand = renderer.xr.getHand(i); hand.userData.model = handFactory.createHandModel(hand, 'mesh'); hand.add(hand.userData.model); dolly.add(hand);   // malha articulada (material de pele no módulo do pendant)
   const st = { c, line, hit:null, floor:null, handedness:'', idx:i };
@@ -3589,8 +3591,10 @@ function xrUpdate(dt){
   for (const [i,st] of ctrls.entries()){
     st.hit = null; st.floor = null;
     if (!st.c.visible && !st.gamepad) continue;
-    st.line.visible = TP.holdBy !== i;                    // a mão que segura o teach pendant não aponta
-    if (TP.holdBy !== i){
+    // a mão que segura o teach pendant não aponta; com o pendant na mão, a outra mão perto da tela toca com o dedo (sem raio)
+    const touching = TP.held && TP.holdBy !== i && nearScreen(i);
+    st.line.visible = TP.holdBy !== i && !touching;
+    if (TP.holdBy !== i && !touching){
     xr.m.identity().extractRotation(st.c.matrixWorld);
     xr.ray.ray.origin.setFromMatrixPosition(st.c.matrixWorld);
     xr.ray.ray.direction.set(0,0,-1).applyMatrix4(xr.m);
@@ -3636,12 +3640,12 @@ renderer.xr.addEventListener('sessionstart', ()=>{
   panel.visible = true; xrLabels.forEach(s=>s.visible=true); labels.forEach(l=>l.visible=false); netLabels.forEach(l=>l.visible=false);
   if (xrMode==='ar'){ room.visible = false; scene.background = null; renderer.setClearAlpha(0); }
   sun.shadow.mapSize.set(1024,1024); sun.shadow.map?.dispose(); sun.shadow.map = null;
+  if (!bakeEnv.done) setTimeout(bakeEnv, 300);
   drawPanel();
   log(xrMode==='ar' ? 'Sessão de realidade mista iniciada' : 'Sessão de realidade virtual iniciada');
 });
 renderer.xr.addEventListener('sessionend', ()=>{
   xrMode = null; scadaReset(); controls.enabled = true;
-  if (bakeEnv.pending){ bakeEnv.pending = false; setTimeout(bakeEnv, 60); }
   dolly.position.set(0,0,0); dolly.rotation.set(0,0,0);
   camera.position.copy(HOME.pos); controls.target.copy(HOME.tgt); camera.updateProjectionMatrix();
   panel.visible = false; xrLabels.forEach(s=>s.visible=false); labels.forEach(l=>l.visible=$('btnLabels').getAttribute('aria-pressed')==='true');
@@ -3914,9 +3918,9 @@ function manualGrip(close){
 }
 
 /* ---------- modelo 3D: teach pendant 12" (300 × 231 × 50 mm), moldura azul, carcaça cinza, Freedrive na traseira ---------- */
-const PS = { W:1280, H:800, c:document.createElement('canvas'), btn:[], press:null, cursor:null, toast:'', toastT:0, t:1, hl:[] };
-PS.c.width = PS.W; PS.c.height = PS.H; PS.g = PS.c.getContext('2d');
-const tpTex = tex(PS.c); tpTex.anisotropy = 8;
+const PS = { W:1280, H:800, k:2, c:document.createElement('canvas'), btn:[], press:null, cursor:null, toast:'', toastT:0, t:1, hl:[] };
+PS.c.width = PS.W*PS.k; PS.c.height = PS.H*PS.k; PS.g = PS.c.getContext('2d');      // coordenadas de desenho em 1280 × 800, textura em 2560 × 1600
+const tpTex = tex(PS.c); tpTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 const TPM = (()=>{
   const dock = new THREE.Group(); dock.position.set(BENCH[2].cx + 0.27, TABLE_Y-0.075, 0.488); scene.add(dock);
   box(0.07,0.07,0.035,M.aluDark,0,-0.03,0.0175,dock);                                          // suporte do pendant
@@ -4496,7 +4500,7 @@ function drawModal(){
 
 /* ---------- desenho geral e destaque do passo atual do roteiro ---------- */
 function tpDraw(){
-  const g = PS.g; PS.btn.length = 0;
+  const g = PS.g; PS.btn.length = 0; g.setTransform(PS.k, 0, 0, PS.k, 0, 0);
   g.fillStyle = PC.bg; g.fillRect(0, 0, PS.W, PS.H);
   if (TP.screen==='init') drawInit(); else if (TP.screen==='start') drawStart(); else if (TP.screen==='mrp' && TP.mrp) drawMRP();
   else ({ run:drawRun, prog:drawProg, inst:drawInst, move:drawMove, io:drawIO, log:drawLog })[TP.tab]();
@@ -4792,7 +4796,7 @@ const LESSONS = [
       { t:'Em <b>Recurso</b> (Feature), escolha <b>Ferramenta</b>: agora as setas seguem os eixos da garra.', hl:'feat:tool', ok:()=>TP.feature==='tool' },
       { t:'Segure uma seta de <b>Orientação do TCP</b> e gire a ferramenta 10° em torno do TCP.', hl:'jr:*', ok:()=>dS('rot') >= 0.17 },
       { t:'Em <b>Posição das juntas</b>, segure − ou + de uma junta até girar 15°.', hl:'jj:*', ok:()=>dS('joint') >= 0.26 },
-      { t:'Freedrive: no óculos, segure o <b>gatilho da mão esquerda</b>, que segura o pendant (botão traseiro), e puxe a ferramenta com a mão direita (botão de pega). No computador, toque em <b>Freedrive</b> e arraste a ferramenta na cena. Conduza 5 cm.', hl:'free', ok:()=>dS('free') >= 0.05 },
+      { t:'Freedrive: toque em <b>Freedrive</b> (no óculos, com o dedo da mão direita; ou segure o <b>gatilho/pinça da mão esquerda</b>, o botão traseiro do pendant). No óculos, feche a mão direita na ferramenta (ou botão de pega) e conduza o robô; no computador, arraste a ferramenta na cena. Conduza 5 cm.', hl:'free', ok:()=>dS('free') >= 0.05 },
       { t:'Toque em <b>Início</b> (Home) e segure <b>Automático</b> até o braço chegar à posição vertical.', hl:['home','auto'], ok:()=>dS('home') >= 1 },
     ] },
   { title:'3 · Instalação: TCP, carga útil e Home', ref:'Guia XL4002 p. 280–282',
@@ -4906,7 +4910,19 @@ const handPos = i => { const o = handObj(i); o.updateWorldMatrix(true, false); r
 const leftIdx = () => ctrls.findIndex(c=>c.handedness==='left');
 const nearPendant = i => TP.holdBy!==i && handPos(i).distanceTo(TPM.pend.getWorldPosition(V3())) < 0.2;
 const nearPart = i => TP.local ? partsNear(handPos(i), 0.1)[0]?.o : null;
-const nearTool = i => handPos(i).distanceTo(UR3.tool.getWorldPosition(V3())) < 0.18;
+const nearTool = i => { const p = handPos(i); return p.distanceTo(UR3.tool.getWorldPosition(V3())) < 0.18 || p.distanceTo(RB.tip.getWorldPosition(V3())) < 0.12; };
+// ponto de toque na tela: ponta do indicador (mãos rastreadas) ou ponta do controle
+const touchPt = i => { if (TPX.isHand[i]){ const t = hands[i].joints?.['index-finger-tip']; return t ? t.getWorldPosition(V3()) : null; }
+  const c = ctrls[i].c; c.updateWorldMatrix(true, false); return V3(0,0,-0.01).applyMatrix4(c.matrixWorld); };
+const nearScreen = i => { const p = touchPt(i); return !!p && p.distanceTo(TPM.scr.getWorldPosition(V3())) < 0.25; };
+// mão fechada (rastreamento de mãos): pontas do indicador, médio e anelar dobradas até perto dos nós dos dedos
+// (o maior dos três: apontar com o indicador para tocar a tela não conta como mão fechada)
+const FIST = ['index-finger','middle-finger','ring-finger'];
+function handCurl(i){
+  const J = hands[i].joints; if (!J) return null; let m = 0;
+  for (const f of FIST){ const a = J[`${f}-tip`], b = J[`${f}-phalanx-proximal`]; if (!a || !b || !a.visible) return null; m = Math.max(m, a.position.distanceTo(b.position)); }
+  return m;
+}
 const onRobot = h => h && isUnder(h.object, UR3.base);
 function tpGrab(i){
   const h = leftIdx();                                               // qualquer mão seleciona; o pendant vai sempre para a esquerda
@@ -4915,7 +4931,7 @@ function tpGrab(i){
   TP.held = true; TP.holdBy = h; TP.freeHold = false; scene.attach(TPM.pend); TPX.grabT = 0;
   TPM.target = { p:TPM.pend.position.clone(), q:TPM.pend.quaternion.clone() };
   ctrls[h].gamepad?.hapticActuators?.[0]?.pulse?.(0.4, 40); guideRender();
-  tpToast(tt('Pendant na mão esquerda: toque a tela com a direita (raio ou dedo). Gatilho ou pinça da esquerda = Freedrive.','Pendant on the left hand: touch the screen with the right (ray or finger). Left trigger or pinch = Freedrive.'));
+  tpToast(tt('Pendant na mão esquerda: toque a tela com o dedo da mão direita. Freedrive: botão na aba Mover ou gatilho/pinça da esquerda.','Pendant on the left hand: touch the screen with the right index finger. Freedrive: Move tab button or left trigger/pinch.'));
 }
 function tpRelease(){ if (!TP.held) return; TPM.dock.attach(TPM.pend); TPM.target = { p:TPM.hook.position.clone(), q:TPM.hook.quaternion.clone() }; TP.held = false; TP.holdBy = -1; TP.freeHold = false; TPG.dirty = true; }
 // pose do pendant na mão: logo acima da palma, deslocado para o centro do corpo e com a tela voltada para o rosto
@@ -4936,12 +4952,11 @@ function xrSel(i, down){
   if (down){
     let act = null;
     if (TP.holdBy===i){ act = 'free'; TP.freeHold = true; if (!freeOn()) canMove(); }
-    else if (st.hit?.object===TPM.scr){ const u = st.hit.uv; psDown(u.x*PS.W, (1-u.y)*PS.H); TPX.pressBy = i; act = 'screen'; }
+    else if (st.hit?.object===TPM.scr && !TP.held){ const u = st.hit.uv; psDown(u.x*PS.W, (1-u.y)*PS.H); TPX.pressBy = i; act = 'screen'; }   // com o pendant na mão a tela é por toque
     else if (!TP.held && st.hit && isUnder(st.hit.object, TPM.pend) && !st.hit.object.userData.estop){ tpGrab(i); act = 'grab'; }
-    else if (TPX.isHand[i]){
+    else if (TPX.isHand[i] && !TPX.fist[i] && !(TP.held && nearScreen(i))){
       if (!TP.held && nearPendant(i)){ tpGrab(i); act = 'grab'; }
-      else if (nearPart(i)){ carryStart(i, nearPart(i)); act = 'carry'; }
-      else if (freeOn() && nearTool(i)){ dragStart(i); act = 'drag'; }
+      else act = handGrab(i);
     }
     TPX.selAct[i] = act; if (act) TPX.consumed[i] = true;
   } else {
@@ -4966,6 +4981,26 @@ function xrSqz(i, down){
   } else {
     const a = TPX.sqAct[i]; TPX.sqAct[i] = null;
     if (a==='carry') carryEnd(); if (a==='drag'){ TPX.drag = null; TPX.freeStart = null; }
+  }
+}
+// pegar com a mão: peça de treino (controle local) ou ferramenta do robô com o Freedrive ligado
+function handGrab(i){
+  const pk = nearPart(i); if (pk){ carryStart(i, pk); return 'carry'; }
+  if (nearTool(i)){
+    if (freeOn()){ dragStart(i); return 'drag'; }
+    tpToast(!TP.local ? tt('Assuma o controle Local no pendant para conduzir o robô.','Take Local control on the pendant to guide the robot.')
+      : tt('Ligue o Freedrive (aba Mover do pendant ou gatilho/pinça da mão esquerda) para conduzir o robô com a mão.','Turn Freedrive on (pendant Move tab, or left trigger/pinch) to guide the robot by hand.'));
+  }
+  return null;
+}
+function handFree(a){ if (a==='carry') carryEnd(); if (a==='drag'){ TPX.drag = null; TPX.freeStart = null; } }
+TPX.fist = [null,null]; TPX.fistOn = [false,false];
+function fistStep(){
+  for (let i=0;i<2;i++){
+    if (!TPX.isHand[i] || TP.holdBy===i){ if (TPX.fistOn[i]){ TPX.fistOn[i] = false; handFree(TPX.fist[i]); TPX.fist[i] = null; } continue; }
+    const c = handCurl(i); if (c===null) continue;
+    if (!TPX.fistOn[i] && c < 0.055 && !TPX.selAct[i]){ TPX.fistOn[i] = true; TPX.fist[i] = handGrab(i); }
+    else if (TPX.fistOn[i] && c > 0.07){ TPX.fistOn[i] = false; handFree(TPX.fist[i]); TPX.fist[i] = null; }
   }
 }
 ctrls.forEach((st, i)=>{
@@ -5013,19 +5048,20 @@ function tpXR(dt){
     // devolver o pendant ao suporte: encostá-lo no gancho na frente da bancada
     if (TPX.grabT > 1.5 && TPM.pend.getWorldPosition(V3()).distanceTo(TPM.hook.getWorldPosition(V3())) < 0.14) tpRelease();
   }
-  // raio da outra mão sobre a tela
+  fistStep();
+  // raio da outra mão sobre a tela (só com o pendant no suporte)
   for (const [i, st] of ctrls.entries()){
-    if (i===TP.holdBy) continue;
+    if (i===TP.holdBy || TP.held) continue;
     if (st.hit?.object===TPM.scr){ const u = st.hit.uv; PS.cursor = { x:u.x*PS.W, y:(1-u.y)*PS.H }; TPX.hoverT = 1; if (TPX.pressBy===i) psMove(PS.cursor.x, PS.cursor.y); }
   }
-  // toque com a ponta do indicador (rastreamento de mãos)
+  // toque na tela: ponta do indicador (mãos rastreadas) ou, com o pendant na mão, a ponta do controle direito
   for (let i=0;i<2;i++){
-    if (!TPX.isHand[i] || TP.holdBy===i) continue;
-    const tip = hands[i].joints?.['index-finger-tip']; if (!tip) continue;
-    const lp = TPM.scr.worldToLocal(tip.getWorldPosition(V3())), inside = Math.abs(lp.x) < 0.128 && Math.abs(lp.y) < 0.08;
+    if (TP.holdBy===i || !(TPX.isHand[i] || TP.held) || TPX.carry?.i===i || TPX.drag?.i===i){ if (TPX.poke[i]){ TPX.poke[i] = false; TPX.pressBy = -1; psUp(-1, -1); } continue; }
+    const tp = touchPt(i); if (!tp) continue;
+    const lp = TPM.scr.worldToLocal(tp), inside = Math.abs(lp.x) < 0.134 && Math.abs(lp.y) < 0.086;
     const x = (lp.x/0.256 + 0.5)*PS.W, y = (0.5 - lp.y/0.16)*PS.H;
-    if (inside && lp.z < 0.05){ PS.cursor = { x, y }; TPX.hoverT = 1; }
-    if (!TPX.poke[i] && inside && lp.z < 0.005 && lp.z > -0.03 && TPX.pressBy<0){ TPX.poke[i] = true; TPX.pressBy = i; psDown(x, y); }
+    if (inside && lp.z < 0.04 && lp.z > -0.06){ PS.cursor = { x, y }; TPX.hoverT = 1; }
+    if (!TPX.poke[i] && inside && lp.z < 0.004 && lp.z > -0.05 && TPX.pressBy<0){ TPX.poke[i] = true; TPX.pressBy = i; psDown(x, y); ctrls[i].gamepad?.hapticActuators?.[0]?.pulse?.(0.35, 25); }
     else if (TPX.poke[i]){ if (lp.z > 0.012 || !inside){ TPX.poke[i] = false; TPX.pressBy = -1; psUp(x, y, true); } else psMove(x, y); }
   }
   // Freedrive: o TCP segue a mão que segura a ferramenta
@@ -5035,16 +5071,16 @@ function tpXR(dt){
       const W = new THREE.Matrix4().multiplyMatrices(gr.matrixWorld, TPX.drag.off); freeTo(new THREE.Matrix4().copy(UR3.base.matrixWorld).invert().multiply(W)); }
   }
 }
-renderer.xr.addEventListener('sessionend', ()=>{ hideComp(); tpRelease(); TPX.drag = null; carryEnd(); TPX.pressBy = -1; PS.cursor = null; TP.freeHold = false; });
+renderer.xr.addEventListener('sessionend', ()=>{ hideComp(); tpRelease(); TPX.drag = null; carryEnd(); TPX.pressBy = -1; TPX.poke = [false,false]; TPX.fist = [null,null]; TPX.fistOn = [false,false]; PS.cursor = null; TP.freeHold = false; });
 renderer.xr.addEventListener('sessionstart', ()=>{ if (TP.open) closeTP(); });
 
 // painel do roteiro no óculos, ao lado do robô
 const TPG = (()=>{
-  const c = document.createElement('canvas'); c.width = 1024; c.height = 680; const t = tex(c);
+  const c = document.createElement('canvas'); c.width = 2048; c.height = 1360; const t = tex(c); t.anisotropy = renderer.capabilities.getMaxAnisotropy();   // 1024 × 680 lógicos em dobro
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.64, 0.64*680/1024), new THREE.MeshBasicMaterial({ map:t, transparent:true, toneMapped:false, side:THREE.DoubleSide }));
   UR3.base.updateWorldMatrix(true, false); const b = UR3.base.getWorldPosition(V3());
   mesh.position.set(b.x+0.78, 1.5, b.z+0.2); mesh.rotation.y = -0.55; mesh.visible = false; scene.add(mesh);
-  return { c, g:c.getContext('2d'), t, mesh, btn:[], dirty:true };
+  return { c, g:c.getContext('2d'), t, mesh, btn:[], dirty:true, W:1024, H:680 };
 })();
 function richWrap(g, html, x, y, maxW, lh, size){
   const words = []; let bold = false;
@@ -5059,7 +5095,8 @@ function richWrap(g, html, x, y, maxW, lh, size){
   return cy + lh;
 }
 function guideDraw(){
-  const { g, c } = TPG, Ls = LESSONS[TP.lesson]; TPG.btn.length = 0;
+  const { g } = TPG, c = { width:TPG.W, height:TPG.H }, Ls = LESSONS[TP.lesson]; TPG.btn.length = 0;
+  g.setTransform(TPG.c.width/TPG.W, 0, 0, TPG.c.height/TPG.H, 0, 0);
   g.clearRect(0, 0, c.width, c.height); g.fillStyle = 'rgba(14,17,19,.92)'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#62d26f'; g.fillRect(0, 0, c.width, 8);
   g.fillStyle = '#62d26f'; g.font = F.m(20,500); g.fillText('ROTEIRO DE APRENDIZAGEM · TEACH PENDANT UR3e', 28, 46);
   g.fillStyle = '#e6ecee'; g.font = F.d(40,700); g.fillText(Ls.title.toUpperCase(), 28, 96);
@@ -5080,7 +5117,7 @@ function guideDraw(){
   TPG.t.needsUpdate = true; TPG.dirty = false;
 }
 function guideClick(uv){
-  const x = uv.x*TPG.c.width, y = (1-uv.y)*TPG.c.height, b = TPG.btn.find(b=>x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h); if (!b) return false;
+  const x = uv.x*TPG.W, y = (1-uv.y)*TPG.H, b = TPG.btn.find(b=>x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h); if (!b) return false;
   if (b.id==='prev') setLesson(TP.lesson-1); if (b.id==='next') setLesson(TP.lesson+1); if (b.id==='restart') setLesson(TP.lesson); if (b.id==='dock') tpRelease();
   guideDraw(); return true;
 }
@@ -5119,7 +5156,7 @@ function tpTick(dt){
   PS.toastT -= dt; PS.t += dt;
   TPX.hoverT = Math.max(0, (TPX.hoverT||0) - dt);
   const xrOn = renderer.xr.isPresenting, fast = TP.open || TP.held || !!PS.press || TPX.pressBy>=0 || TPX.hoverT > 0;
-  if (PS.t > (fast ? (xrOn ? 1/12 : 1/15) : 0.5)){ PS.t = 0; tpDraw(); tpTex.needsUpdate = true; if (xrOn && TPG.dirty) guideDraw(); }   // a textura de 1280 × 800 sobe para a GPU no máximo 12×/s no óculos
+  if (PS.t > (fast ? (xrOn ? 1/12 : 1/15) : 0.5)){ PS.t = 0; tpDraw(); tpTex.needsUpdate = true; if (xrOn && TPG.dirty) guideDraw(); }   // a textura de 2560 × 1600 sobe para a GPU no máximo 12×/s no óculos
   TPG.mesh.visible = xrOn && (TP.local || TP.held);
 }
 
